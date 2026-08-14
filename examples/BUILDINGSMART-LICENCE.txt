@@ -1,0 +1,8 @@
+(C) buildingSMART International Ltd.
+
+This work is licensed under the Creative Commons Attribution 4.0 International License.
+More information and the full licence text are available at:
+https://creativecommons.org/licenses/by/4.0/
+
+Original repository:
+https://github.com/buildingSMART/Sample-Test-Files
