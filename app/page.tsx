@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   analyseModel,
   buildReport,
+  candidateSamples,
   compareModels,
   demoModels,
   interpretRule,
@@ -50,6 +51,7 @@ export default function Home() {
   const [ruleText, setRuleText] = useState("Flag confirmed exit doors with a clear width below 950 mm");
   const [draftRule, setDraftRule] = useState<ConfirmedRule | null>(null);
   const [confirmedRules, setConfirmedRules] = useState<ConfirmedRule[]>([]);
+  const [candidateModels, setCandidateModels] = useState<BuildingModel[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const copy = labels[language];
@@ -61,6 +63,27 @@ export default function Home() {
   }), [findings]);
   const selected = findings.find((finding) => finding.id === selectedId) ?? findings[0];
   const comparison = useMemo(() => compareModels(baseline, model), [baseline, model]);
+  const allModels = useMemo(() => [...Object.values(demoModels), ...candidateModels], [candidateModels]);
+  const benchmarkRows = useMemo(() => candidateModels.map((candidate) => {
+    const results = analyseModel(candidate);
+    return {
+      model: candidate,
+      fail: results.filter((item) => item.status === "FAIL").length,
+      review: results.filter((item) => item.status === "REVIEW").length,
+      pass: results.filter((item) => item.status === "PASS").length,
+      na: results.filter((item) => item.status === "NOT_APPLICABLE").length,
+    };
+  }), [candidateModels]);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(candidateSamples.map(async (sample) => {
+      const response = await fetch(sample.path);
+      const parsed = parseIfc(await response.text(), sample.name);
+      return { ...parsed, id: sample.id, name: `${sample.label} · ${sample.name}`, provenance: `${sample.note} · ${sample.licence}` };
+    })).then((loaded) => { if (!cancelled) setCandidateModels(loaded); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
 
   const runReview = () => {
     setBusy(true);
@@ -92,6 +115,14 @@ export default function Home() {
     setRan(false);
     setToast(`${demoModels[key].name} loaded`);
     window.setTimeout(() => setToast(""), 2200);
+  };
+
+  const loadCandidate = (candidate: BuildingModel) => {
+    setModel(candidate);
+    setFindings([]);
+    setRan(false);
+    setToast(`${candidate.name} loaded for independent review`);
+    window.setTimeout(() => setToast(""), 2400);
   };
 
   const downloadReport = () => {
@@ -144,6 +175,13 @@ export default function Home() {
                 <span><strong>{demoModels[key].name}</strong><small>{demoModels[key].doors.length} doors · {demoModels[key].schema}</small></span>
               </button>
             ))}
+            <div className="sample-title"><span>Candidate benchmarks</span><span>{candidateModels.length}/3</span></div>
+            {candidateModels.map((candidate) => (
+              <button className={`sample ${model.id === candidate.id ? "current" : ""}`} key={candidate.id} onClick={() => loadCandidate(candidate)}>
+                <span className="file-icon">IFC</span>
+                <span><strong>{candidate.name}</strong><small>{candidate.doors.length} doors · {candidate.schema}</small></span>
+              </button>
+            ))}
             <div className="scope-card">
               <div className="eyebrow">ACTIVE RULE PACK</div>
               <strong>Assessment evidence profile</strong>
@@ -157,7 +195,8 @@ export default function Home() {
               <div>
                 <span className="breadcrumb">PROJECT / {model.schema} / PRE-REVIEW</span>
                 <h1>{model.name}</h1>
-                <p>{model.doors.length} doors · {model.storeys} storeys · Evidence extracted {model.source === "uploaded" ? "from uploaded IFC" : "from a controlled sample"}</p>
+                <p>{model.doors.length} doors · {model.storeys} storeys · Evidence extracted {model.source === "uploaded" ? "from IFC STEP" : "from a controlled sample"}</p>
+                {model.provenance && <p className="provenance">{model.provenance}</p>}
               </div>
               <button className="primary" onClick={runReview} disabled={busy}>{busy ? "Reviewing evidence…" : copy.run}</button>
             </div>
@@ -227,12 +266,19 @@ export default function Home() {
         <section className="page-view">
           <div className="page-intro"><span className="eyebrow">MODEL VERSION CONTROL</span><h1>Show what changed, not merely what failed.</h1><p>Compare stable IFC GlobalIds across submissions and surface resolved, regressed and unchanged evidence.</p></div>
           <div className="compare-pickers">
-            <label>BASELINE<select value={baseline.id} onChange={(event) => setBaseline(Object.values(demoModels).find((item) => item.id === event.target.value) ?? demoModels.baseline)}>{Object.values(demoModels).map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
+            <label>BASELINE<select value={baseline.id} onChange={(event) => setBaseline(allModels.find((item) => item.id === event.target.value) ?? demoModels.baseline)}>{allModels.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
             <span>→</span>
-            <label>CURRENT<select value={model.id} onChange={(event) => setModel(Object.values(demoModels).find((item) => item.id === event.target.value) ?? model)}>{Object.values(demoModels).map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
+            <label>CURRENT<select value={model.id} onChange={(event) => setModel(allModels.find((item) => item.id === event.target.value) ?? model)}>{allModels.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
           </div>
           <div className="compare-summary"><div><strong>{comparison.resolved}</strong><span>Resolved</span></div><div><strong>{comparison.regressed}</strong><span>Regressed</span></div><div><strong>{comparison.changed}</strong><span>Changed</span></div><div><strong>{comparison.unchanged}</strong><span>Unchanged</span></div></div>
           <div className="diff-table"><div className="diff-row diff-header"><span>Element</span><span>Baseline</span><span>Current</span><span>Change</span></div>{comparison.items.map((item) => <div className="diff-row" key={item.id}><span><b>{item.name}</b><small>{item.id}</small></span><span>{item.before}</span><span>{item.after}</span><span className={`change-${item.kind}`}>{item.label}</span></div>)}</div>
+          <div className="benchmark-section">
+            <div className="page-intro"><span className="eyebrow">INDEPENDENT SUBMISSION BENCHMARK</span><h2>One evidence policy, three candidate IFC files.</h2><p>These are raw parser outcomes, not the candidates’ own claimed results. A high REVIEW count exposes missing or proxy evidence; it is not automatically a poor compliance score.</p></div>
+            <div className="benchmark-table">
+              <div className="benchmark-row benchmark-header"><span>Submission sample</span><span>Doors</span><span>Fail</span><span>Review</span><span>Pass</span><span>N/A</span><span>Interpretation</span></div>
+              {benchmarkRows.map((row) => <button className="benchmark-row" key={row.model.id} onClick={() => { loadCandidate(row.model); setView("review"); }}><span><b>{row.model.name}</b><small>{row.model.provenance}</small></span><span>{row.model.doors.length}</span><span className="metric-fail">{row.fail}</span><span className="metric-review">{row.review}</span><span className="metric-pass">{row.pass}</span><span>{row.na}</span><span>{row.fail ? "Explicit evidence supports a failure" : row.review ? "Human evidence confirmation required" : "No applicable door findings"}</span></button>)}
+            </div>
+          </div>
         </section>
       )}
 

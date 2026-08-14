@@ -35,6 +35,7 @@ The 900 mm threshold demonstrates the checking architecture. It is not presented
 - Faithful English and Chinese Markdown reports.
 - Three assessment scenarios: revised clinic, failing baseline and evidence gaps.
 - A 225 KB official buildingSMART IFC4 sample as a licensed no-door negative control.
+- Three attributed candidate benchmark IFC files, reviewed under one independent evidence policy.
 - Responsive, keyboard-accessible interface with no API key required for the deterministic demonstration.
 
 ## Quick start
@@ -47,6 +48,8 @@ npm run dev
 ```
 
 Open the local URL shown in the terminal. Select **Harbour Clinic · R02**, run the evidence review, inspect a `FAIL` or `REVIEW` finding, compare R01 with R02, then propose a 950 mm project rule in **Rule studio**.
+
+For comparative assessment, select any item under **Candidate benchmarks**, run the review, then open **Compare** to inspect the aggregate benchmark table. Raw counts must be interpreted in context: a synthetic failure fixture and a realistic model with missing compliance properties are testing different things.
 
 ## Verification
 
@@ -63,6 +66,7 @@ app/                  Product interface
 lib/compliance.ts     Normalised evidence, deterministic rules and IFC intake
 prompts/              Agent, project-rule and report contracts
 examples/             Small IFC fixtures and provenance notes
+public/samples/        Licensed candidate benchmark files and attribution
 docs/                 Architecture and assessment mapping
 tests/                Deployed-render smoke tests
 .openai/hosting.json  Sites deployment metadata

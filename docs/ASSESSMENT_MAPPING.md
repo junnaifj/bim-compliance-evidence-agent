@@ -11,3 +11,7 @@
 | Helpful visualisation | Evidence map, finding drawer, status summary and model-version diff |
 | Code and prompts | Source plus three explicit prompt contracts |
 | Video under three minutes | Deferred by the project owner for the current phase |
+
+## Comparative benchmark
+
+The deployed interface also loads one attributed IFC from each reviewed submission and evaluates it through the same parser and deterministic rules. Results are explicitly presented as evidence-readiness outcomes rather than a universal compliance ranking.

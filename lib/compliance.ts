@@ -14,8 +14,15 @@ export type BuildingModel = {
   schema: string;
   storeys: number;
   source: "sample" | "uploaded";
+  provenance?: string;
   doors: Door[];
 };
+
+export const candidateSamples = [
+  { id: "greatandyc", label: "GreatAndyC", name: "Mixed review", path: "/samples/greatandyc-mixed-review.ifc", licence: "MIT", note: "Synthetic IFC4 · explicit FireExit and ClearWidth evidence" },
+  { id: "waterywaterman", label: "WateryWaterman", name: "Duplex", path: "/samples/waterywaterman-duplex.ifc", licence: "Apache-2.0", note: "Realistic IFC2x3 · 14 doors · xeokit sample" },
+  { id: "mickey12go", label: "Mickey12go", name: "Sample doors", path: "/samples/mickey12go-sample-doors.ifc", licence: "MIT", note: "Hand-authored IFC4 · three doors" },
+] as const;
 
 export type FindingStatus = "PASS" | "FAIL" | "REVIEW" | "NOT_APPLICABLE";
 export type Finding = {
@@ -111,14 +118,55 @@ function splitStepArguments(line: string): string[] {
 
 export function parseIfc(text: string, filename: string): BuildingModel {
   const schema = text.match(/FILE_SCHEMA\s*\(\s*\(\s*'([^']+)'/i)?.[1] ?? "IFC (unresolved)";
-  const projectName = text.match(/IFCPROJECT\s*\([^;]*?'([^']+)'/i)?.[1];
+  const projectLine = text.match(/#\d+\s*=\s*IFCPROJECT\s*\([^;]+;/i)?.[0];
+  const projectStrings = projectLine ? [...projectLine.matchAll(/'([^']*)'/g)].map((match) => match[1]) : [];
+  const projectName = projectStrings[1];
+  const entityLines = new Map<string, string>();
+  for (const match of text.matchAll(/#(\d+)\s*=\s*([^;]+);/gi)) entityLines.set(match[1], match[2]);
+  const propertyValues = new Map<string, { name: string; value?: string | number | boolean }>();
+  const propertySets = new Map<string, { name: string; properties: string[] }>();
+  const assignments = new Map<string, string[]>();
+  for (const [id, line] of entityLines) {
+    if (/^IFCPROPERTYSINGLEVALUE\s*\(/i.test(line)) {
+      const name = line.match(/IFCPROPERTYSINGLEVALUE\s*\(\s*'([^']+)'/i)?.[1] ?? "";
+      const boolean = line.match(/IFCBOOLEAN\s*\(\s*\.(T|F)\./i)?.[1];
+      const number = line.match(/IFC(?:LENGTHMEASURE|REAL|INTEGER)\s*\(\s*(-?\d+(?:\.\d+)?)/i)?.[1];
+      const label = line.match(/IFC(?:LABEL|TEXT|IDENTIFIER)\s*\(\s*'([^']*)'/i)?.[1];
+      propertyValues.set(id, { name, value: boolean ? boolean.toUpperCase() === "T" : number !== undefined ? Number(number) : label });
+    }
+    if (/^IFCPROPERTYSET\s*\(/i.test(line)) {
+      const name = [...line.matchAll(/'([^']*)'/g)].map((match) => match[1])[1] ?? "";
+      const refsBlock = line.match(/\(\s*(#[\d\s,#]+)\s*\)\s*\)$/)?.[1] ?? "";
+      propertySets.set(id, { name, properties: [...refsBlock.matchAll(/#(\d+)/g)].map((match) => match[1]) });
+    }
+    if (/^IFCRELDEFINESBYPROPERTIES\s*\(/i.test(line)) {
+      const relation = line.match(/,\s*\((#[\d\s,#]+)\)\s*,\s*#(\d+)\s*\)$/i);
+      if (relation) {
+        const targets = [...relation[1].matchAll(/#(\d+)/g)].map((match) => match[1]);
+        targets.forEach((target) => assignments.set(target, [...(assignments.get(target) ?? []), relation[2]]));
+      }
+    }
+  }
   const lines = text.match(/#\d+\s*=\s*IFCDOOR\s*\([^;]+;/gi) ?? [];
-  const doors = lines.map((line, index) => {
+  const doors = lines.map((line, index): Door => {
+    const entityId = line.match(/^#(\d+)/)?.[1] ?? "";
     const body = line.slice(line.indexOf("(") + 1, line.lastIndexOf(")")); const args = splitStepArguments(body);
     const strings = [...line.matchAll(/'([^']*)'/g)].map((match) => match[1]);
     const numeric = args.map((arg) => Number(arg)).filter(Number.isFinite);
     const widthRaw = numeric.at(-1); const widthMm = widthRaw ? Math.round(widthRaw > 20 ? widthRaw : widthRaw * 1000) : undefined;
-    return { globalId: strings[0] || `UNRESOLVED-${index + 1}`, name: strings[2] || `Door ${index + 1}`, widthMm, widthSource: widthMm ? "overall_width_proxy" as const : "missing" as const, isExit: undefined };
+    const properties = (assignments.get(entityId) ?? []).flatMap((setId) => propertySets.get(setId)?.properties ?? []).map((propertyId) => propertyValues.get(propertyId)).filter(Boolean) as { name: string; value?: string | number | boolean }[];
+    const findProperty = (name: string) => properties.find((property) => property.name.toLowerCase() === name.toLowerCase())?.value;
+    const clearWidth = findProperty("ClearWidth");
+    const fireExit = findProperty("FireExit");
+    const fireRating = findProperty("FireRating");
+    return {
+      globalId: strings[0] || `UNRESOLVED-${index + 1}`,
+      name: strings[1] || "",
+      widthMm: typeof clearWidth === "number" ? Math.round(clearWidth > 20 ? clearWidth : clearWidth * 1000) : widthMm,
+      widthSource: typeof clearWidth === "number" ? "clear_width" : widthMm ? "overall_width_proxy" : "missing",
+      isExit: typeof fireExit === "boolean" ? fireExit : undefined,
+      fireRating: typeof fireRating === "string" ? fireRating : undefined,
+    };
   });
   return { id: `upload-${Date.now()}`, name: projectName || filename.replace(/\.ifc$/i, ""), schema, storeys: Math.max(1, (text.match(/IFCBUILDINGSTOREY\s*\(/gi) ?? []).length), source: "uploaded", doors };
 }
