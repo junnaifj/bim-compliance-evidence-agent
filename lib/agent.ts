@@ -1,22 +1,25 @@
 import { audit, type AuditEvent } from "./memory.ts";
 
-export type AgentProvider = { id: "local" | "openai" | "anthropic" | "google" | "openrouter"; name: string; mode: "ready" | "operator-configuration-required"; privacy: { en: string; zh: string }; suitableFor: { en: string; zh: string } };
+export type AgentAvailability = "ready" | "credential-required" | "planned";
+export type AgentProvider = { id: "local" | "openai" | "anthropic" | "google" | "openrouter"; name: string; mode: AgentAvailability; privacy: { en: string; zh: string }; suitableFor: { en: string; zh: string } };
 export const providers: AgentProvider[] = [
   { id: "local", name: "Local deterministic", mode: "ready", privacy: { en: "Files remain in this browser session.", zh: "文件保留在当前浏览器会话中。" }, suitableFor: { en: "IFC parsing, rule execution, conflict checks and verified reports", zh: "IFC 解析、规则执行、冲突检查和已验证报告" } },
-  { id: "openai", name: "OpenAI", mode: "operator-configuration-required", privacy: { en: "A separately billed server-side API credential is required; a ChatGPT or Codex login is not reused and credentials are never entered in the browser.", zh: "需要单独计费的服务端 API 凭据；不会复用 ChatGPT 或 Codex 登录，且绝不在浏览器中输入凭据。" }, suitableFor: { en: "Optional document interpretation and report drafting; extracted content remains subject to human approval", zh: "可选文档理解与报告草拟；提取内容仍须人工确认" } },
-  { id: "anthropic", name: "Anthropic", mode: "operator-configuration-required", privacy: { en: "Install an authorised server-side connector.", zh: "需要安装已授权的服务端连接器。" }, suitableFor: { en: "Optional document interpretation", zh: "可选文档理解" } },
-  { id: "google", name: "Google", mode: "operator-configuration-required", privacy: { en: "Install an authorised server-side connector.", zh: "需要安装已授权的服务端连接器。" }, suitableFor: { en: "Optional document interpretation", zh: "可选文档理解" } },
-  { id: "openrouter", name: "OpenRouter", mode: "operator-configuration-required", privacy: { en: "Install an authorised server-side connector.", zh: "需要安装已授权的服务端连接器。" }, suitableFor: { en: "Optional multi-provider routing", zh: "可选多供应商路由" } },
+  { id: "openai", name: "OpenAI", mode: "credential-required", privacy: { en: "Uses either the operator's server secret or your session-only API key. Only the question and bounded structured evidence are sent; raw IFC and source documents are excluded.", zh: "使用运营者的服务端密钥，或您仅在本次页面会话中提供的 API 密钥。只发送问题和受限结构化证据，不发送原始 IFC 或法规文件。" }, suitableFor: { en: "Evidence-grounded explanation and proposal drafting with server-side verification", zh: "基于证据的解释和建议草拟，并由服务端验证" } },
+  { id: "anthropic", name: "Anthropic", mode: "planned", privacy: { en: "Connector not implemented in this release.", zh: "本版本尚未实现该连接器。" }, suitableFor: { en: "Planned document interpretation", zh: "规划中的文档理解" } },
+  { id: "google", name: "Google", mode: "planned", privacy: { en: "Connector not implemented in this release.", zh: "本版本尚未实现该连接器。" }, suitableFor: { en: "Planned document interpretation", zh: "规划中的文档理解" } },
+  { id: "openrouter", name: "OpenRouter", mode: "planned", privacy: { en: "Connector not implemented in this release.", zh: "本版本尚未实现该连接器。" }, suitableFor: { en: "Planned multi-provider routing", zh: "规划中的多供应商路由" } },
 ];
 
 export type AgentRole = "orchestrator" | "review" | "rules" | "documents" | "report" | "verifier";
-export type AgentModel = { id: string; providerId: AgentProvider["id"]; name: string; mode: "ready" | "operator-configuration-required"; execution: "deterministic" | "generative" };
+export type AgentModel = { id: string; providerId: AgentProvider["id"]; name: string; mode: AgentAvailability; execution: "deterministic" | "generative" };
 export const agentModels: AgentModel[] = [
   { id:"evidence-local-v1", providerId:"local", name:"Evidence Local v1", mode:"ready", execution:"deterministic" },
-  { id:"operator-openai", providerId:"openai", name:"OpenAI · operator configured", mode:"operator-configuration-required", execution:"generative" },
-  { id:"operator-anthropic", providerId:"anthropic", name:"Anthropic · operator configured", mode:"operator-configuration-required", execution:"generative" },
-  { id:"operator-google", providerId:"google", name:"Google · operator configured", mode:"operator-configuration-required", execution:"generative" },
-  { id:"operator-openrouter", providerId:"openrouter", name:"OpenRouter · operator configured", mode:"operator-configuration-required", execution:"generative" },
+  { id:"gpt-5.6", providerId:"openai", name:"GPT-5.6", mode:"credential-required", execution:"generative" },
+  { id:"gpt-5.6-terra", providerId:"openai", name:"GPT-5.6 Terra", mode:"credential-required", execution:"generative" },
+  { id:"gpt-5.6-luna", providerId:"openai", name:"GPT-5.6 Luna", mode:"credential-required", execution:"generative" },
+  { id:"planned-anthropic", providerId:"anthropic", name:"Anthropic · planned", mode:"planned", execution:"generative" },
+  { id:"planned-google", providerId:"google", name:"Google · planned", mode:"planned", execution:"generative" },
+  { id:"planned-openrouter", providerId:"openrouter", name:"OpenRouter · planned", mode:"planned", execution:"generative" },
 ];
 
 export function selectableAgentModels(providerId: AgentProvider["id"]): AgentModel[] { return agentModels.filter((item) => item.providerId === providerId); }

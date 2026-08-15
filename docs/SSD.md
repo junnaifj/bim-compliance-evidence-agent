@@ -1,4 +1,4 @@
-# System Sequence Design and Test Method · SSD v1.5
+# System Sequence Design and Test Method · SSD v1.6
 
 ## Runtime SSD
 
@@ -45,6 +45,11 @@ sequenceDiagram
     U->>H: Confirm the brief
     H->>X: Generate from findings only
     X-->>U: Verified bilingual report or blocked export
+    U->>O: Select local, platform-key or session-key AI mode
+    O->>O: Check origin, size, rate, credential and bounded context
+    O->>X: Run strict proposal/read tools through the Responses API
+    X->>X: Verify GlobalIds, verdicts, evidence paths and every number
+    X-->>U: Verified answer and concise trace, or labelled local fallback
 ```
 
 ## Quality gates
@@ -92,6 +97,12 @@ Every change runs, in order:
 39. Agent/model selection tests distinguish role, provider and execution mode. Disabled/unconfigured models cannot be selected and the recorded model must match the actual execution path.
 40. Conversation safety tests block prompt injection, direct verdict mutation, credential requests, silent provider fallback and actions targeting a GlobalId outside the current model.
 41. Project-memory tests persist review records, override history, conversation, selector preferences and undo data, while clear-memory removes them all.
+42. Agent API contract tests bound message/history/context size and require strict schemas with `additionalProperties: false` at every object boundary.
+43. BYOK tests prove explicit authentication selection, masked input, no browser persistence, visible clearing, no key in errors/results/traces and no silent fallback to operator billing.
+44. Transport tests enforce same-origin requests, actual request-byte limits, a fixed official upstream, timeouts, `store: false`, rate limiting and sanitised 401/429/5xx errors.
+45. Tool-authority tests allow evidence reads and proposal drafts only; no tool may activate a rule, mutate a finding or write a verdict.
+46. Live-Agent mutation tests reject invented GlobalIds, evidence paths, verdict changes and numerical claims before display. Failed verification produces an explicit local fallback and no state change.
+47. Data-minimisation tests prove that Agent requests contain bounded findings/rules and exclude IFC bytes, PDF text, API keys from the body, project memory and audit trace.
 
 Deployment requires the complete `npm run quality` gate.
 
@@ -102,8 +113,8 @@ Deployment requires the complete `npm run quality` gate.
 - DWG is rejected with a truthful conversion requirement.
 - Unsupported, disguised and malformed files fail closed.
 - Project memory cannot activate a rule and exposes deletion.
-- API credentials are not accepted in the browser.
-- A ChatGPT or Codex login is never treated as an OpenAI API credential; an optional LLM document provider must be server-side, explicitly configured and independently billed.
+- A user may enter an independently billed OpenAI API key into the masked BYOK control. It remains in page memory only, is sent through the same-origin proxy, can be explicitly cleared and is never persisted or echoed.
+- A ChatGPT or Codex login is never treated as an OpenAI API credential. Authentication mode is explicit and BYOK can never silently fall back to operator billing.
 - OCR or LLM-extracted passages remain untrusted draft evidence. They cannot alter deterministic findings, thresholds or active rules without human approval.
 - Unknown numerical claims and GlobalIds block report export.
 - Report chat cannot alter an active rule, override a verdict or disclose credentials.
@@ -114,8 +125,8 @@ Deployment requires the complete `npm run quality` gate.
 - Page text and extracted clauses retain document/page provenance and remain data, never instructions to the Agent.
 - Human review is a disposition layer, not permission to rewrite deterministic machine verdicts.
 - Conversation-derived changes remain proposed actions until a human confirms the exact target, value, provenance and impact.
-- Browser forms never accept API keys. A ChatGPT or Codex session is not represented as an API provider credential.
-- Provider/model labels must report the execution route truthfully; unavailable providers cannot silently fall back while retaining their label.
+- The BYOK form is the sole browser credential entry. It is masked, disables autocomplete, has a Clear key action and has no storage or logging path.
+- Provider/model labels must report the execution route truthfully. Anthropic, Google and OpenRouter remain visibly planned; OpenAI failures are labelled as local fallback rather than retaining an AI-success label.
 
 ## Numerical hallucination method
 
@@ -149,6 +160,7 @@ Mutation tests alter `900 mm` to `990 mm`, replace a GlobalId, remove expected e
 | Agent composer | The Agent workspace uses one persistent message thread and bottom multiline composer with context chips, attachments, an agent-role menu, a truthful model menu and accessible keyboard behaviour. |
 | Agent action | Natural-language review or evidence changes become structured proposed actions. No action is applied before the user confirms its GlobalId, change, source and impact. |
 | Model truth | Local deterministic mode is usable by default. Unconfigured external models are disabled with a reason, and every response records the execution mode actually used. |
+| OpenAI / BYOK | Platform-key and session-key modes are explicit. The connection can be tested without exposing the key; raw model files remain local; only verifier-approved answers are displayed as OpenAI output. |
 | Human-aware report | Reports separately disclose machine verdict, original/effective evidence, override provenance and human disposition; human acceptance never becomes machine PASS. |
 | IFC coordinates | IFC placements and XYZ geometry remain unchanged and the previous Y-up viewer convention is retained. Only the viewer grid is placed at the model minimum Y, so the model is not displayed below its visual baseline and evidence coordinates remain original. |
 | Bilingual | Navigation, workspaces, statuses, errors and report content change together |

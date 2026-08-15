@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { agentModels, classifyAgentRequest, selectableAgentModels } from "../lib/agent.ts";
 
-test("only the deterministic local model is selectable without operator configuration", () => {
+test("local remains ready, OpenAI supports credentials, and unimplemented connectors stay unavailable", () => {
   assert.deepEqual(selectableAgentModels("local").map((item) => item.id), ["evidence-local-v1"]);
   assert.equal(agentModels.find((item) => item.id === "evidence-local-v1")?.mode, "ready");
-  assert.ok(agentModels.filter((item) => item.providerId !== "local").every((item) => item.mode === "operator-configuration-required"));
+  assert.deepEqual(selectableAgentModels("openai").map((item) => item.id), ["gpt-5.6", "gpt-5.6-terra", "gpt-5.6-luna"]);
+  assert.ok(selectableAgentModels("openai").every((item) => item.mode === "credential-required"));
+  assert.ok(agentModels.filter((item) => !["local", "openai"].includes(item.providerId)).every((item) => item.mode === "planned"));
 });
 
 test("agent routing proposes evidence and rule changes instead of changing verdicts", () => {

@@ -19,6 +19,8 @@ flowchart LR
     V --> P[Bilingual report]
     O <--> M[Project memory]
     O --> T[Auditable event trace]
+    O --> A[Optional OpenAI Responses API]
+    A --> X[Strict structured-output verifier]
 ```
 
 ## Evidence contract
@@ -41,11 +43,12 @@ Conflict analysis distinguishes duplicate, stricter, looser and overlapping rule
 
 ## Memory and providers
 
-Session context, approved project rules and audit decisions are separated. This assessment build stores project memory locally on the device and provides a clear action to erase it. Provider selection does not change deterministic findings. Optional hosted providers require server-side credentials and are intentionally unavailable until an operator configures an authorised connector.
+Session context, approved project rules and audit decisions are separated. This assessment build stores project memory locally on the device and provides a clear action to erase it. Provider selection does not change deterministic findings. OpenAI may use an operator-managed server secret or a user-supplied session key. The session key is held only in component memory and is never persisted or recorded. Other provider connectors are labelled as planned and cannot be selected.
+
+The OpenAI route sends bounded structured context—not IFC/PDF bytes—to the Responses API with `store: false`. A four-step maximum tool loop exposes only read and proposal tools. Strict Structured Outputs are parsed and then independently checked against current GlobalIds, verdicts, evidence paths and numerical allow-lists. A rejected or unavailable response is labelled and handled by the local deterministic fallback; it cannot change state.
 
 The transparent trace shows plan, tool, decision and guardrail events. It does not expose or claim to expose hidden chain-of-thought.
 
 ## Copyright boundary
 
 Hong Kong Government sources are registered by official URL and publisher. The public repository does not redistribute the full documents. An authorised local copy may be uploaded for private preview and candidate-rule extraction.
-

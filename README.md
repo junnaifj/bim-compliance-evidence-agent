@@ -18,7 +18,7 @@ The complete demonstration works without an API key:
 4. Propose a natural-language rule. The Agent checks feasibility and the active catalogue before asking whether to replace the existing rule, keep both with distinct scope, or cancel.
 5. Upload a PDF, DOCX, XLSX, CSV, IDS, IFC, DXF or text rule source. The document workspace reports extraction status, page and character evidence, previews the original, creates deterministic numerical drafts and lists non-executable requirement passages for optional conflict review.
 6. Select a finding and record a human disposition independently from the read-only machine verdict. Correct structured evidence only with a named reviewer, provenance and reason; inspect the before/after impact, confirm it explicitly, rerun the affected checks and undo it if necessary. The source IFC is never overwritten.
-7. Work with the Codex-style Evidence Agent in one continuous thread. Agent, provider and model controls sit in the composer; unconfigured external models are visibly unavailable, and every rule or evidence change remains a proposal until human confirmation.
+7. Work with the Codex-style Evidence Agent in one continuous thread. Local deterministic mode needs no account. OpenAI mode uses either an operator-managed server secret or the user's session-only API key, with GPT-5.6 model selection, strict tools, grounded-output verification and a truthful local fallback. Every rule or evidence change remains a proposal until human confirmation.
 8. Tell the in-app Report Agent—in ordinary English or Chinese—who will read the report and what it should emphasise. Review its editable brief and generate without copying a prompt. Export is enabled only after identifiers, verdicts and numerical claims pass verification; human dispositions and applied evidence corrections are disclosed separately.
 
 ## Deterministic rules
@@ -60,7 +60,7 @@ Extracted clauses remain `DRAFT`. A source page, sheet or text segment is retain
 - Evidence Verifier — identifier and numerical guardrail.
 - Report Agent — converts natural language into an editable, human-confirmed brief and produces an evidence-bound English, Chinese or bilingual narrative. A copyable external-LLM package is available only as an advanced option.
 
-Project memory is device-local, inspectable and erasable. It stores approved rules and decisions, never API keys, and cannot bypass approval. Optional provider entries are deliberately separated from rule truth; the local path always remains available.
+Project memory is device-local, inspectable and erasable. It stores approved rules and decisions, never API keys, and cannot bypass approval. An optional user-supplied OpenAI key is held only in page memory, passes through a same-origin server proxy and is cleared by refresh, page close or the visible Clear key action. It is never written to project memory, browser storage, logs or traces. Only bounded structured findings and rules are sent to the model; raw IFC and rule-source files stay in the browser. The local path always remains available.
 
 Human review is a separate audit layer. It records reviewer dispositions, notes and version history without rewriting machine outcomes. Evidence corrections are applied to an effective review model with source, reason, reviewer and timestamp; the uploaded IFC remains immutable.
 
@@ -72,6 +72,8 @@ Requires Node.js 22.13 or later.
 npm ci
 npm run dev
 ```
+
+OpenAI is optional. Copy `.env.example` to `.env.local` to configure an operator-managed server key, or select **OpenAI → My session API key** in the Agent workspace to test with your own separately billed API account. Never paste a key into source code, Git, an issue or a chat message. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 Quality gates:
 
@@ -101,6 +103,9 @@ lib/human-review.ts          Human review records, correction previews and effec
 lib/document-intelligence.ts Rule-source parsing and official-source registry
 lib/memory.ts                Device-local project and audit memory
 lib/agent.ts                 Provider registry and transparent orchestration trace
+lib/openai-agent.server.ts   Responses API tool loop and verified structured output
+lib/agent-gateway.ts         Explicit operator/BYOK credentials and rate limits
+app/api/agent/               Same-origin, no-store server API routes
 lib/report-agent.ts          Natural-language report brief, routing and safeguards
 lib/viewer-interaction.ts    Hover/selection state and GlobalId finding filters
 public/samples/               Licensed real IFC assessment models
