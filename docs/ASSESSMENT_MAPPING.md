@@ -2,16 +2,17 @@
 
 | Requirement | Evidence in this repository |
 | --- | --- |
-| Web micro-prototype or intelligent agent | Deployed interactive review workspace |
-| One or two rules | Two built-in deterministic rules |
-| BIM/CAD input | IFC2x3 and IFC4 STEP upload plus controlled samples |
-| AI use | Evidence-bound explanation contract and human-confirmed rule interpretation |
-| Clean structure | UI, domain logic, prompts, tests, samples and architecture are separated |
-| Human–AI interaction | Missing-evidence next steps and a confirmation gate for proposed rules |
-| Helpful visualisation | Evidence map, finding drawer, status summary and model-version diff |
-| Code and prompts | Source plus three explicit prompt contracts |
-| Video under three minutes | Deferred by the project owner for the current phase |
+| Functional web micro-prototype | Deployed vinext application with browser-local IFC processing |
+| One or two rules | `EGRESS-WIDTH-001` and `INFO-001` |
+| AI/Agent judgement | Document extraction, conflict/feasibility suggestions, bounded orchestration and verified reporting |
+| Human–AI interaction | Replace, retain with scope or cancel before activation |
+| Authentic BIM data | Licensed xeokit and buildingSMART IFC2x3/IFC4 samples |
+| Helpful visualisation | Real IFC geometry with navigation, section, X-ray, status colour and GlobalId focus |
+| Clear code and prompts | Separated viewer, compliance, document, memory and Agent modules; public prompts |
+| Model comparison | GlobalId-based baseline/current evidence diff |
+| Chinese and English report | Complete UI locale and verified Markdown export |
+| Engineering judgement | Explicit proxy/missing states; no universal statutory claim; government copyright boundary |
+| Reliability | CI quality gates, sample hashes, security tests and numerical mutation tests |
 
-## Comparative benchmark
+The demonstration is intentionally honest: nominal width is not clear width, missing classification is not inferred from a name, and linked government guidance is not republished without permission.
 
-The deployed interface also loads one attributed IFC from each reviewed submission and evaluates it through the same parser and deterministic rules. Results are explicitly presented as evidence-readiness outcomes rather than a universal compliance ranking.

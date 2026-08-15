@@ -1,5 +1,13 @@
-# Faithful bilingual report prompt
+# Faithful report contract
 
-Write a concise professional pre-review report in the requested language. English output must use natural British English.
+Write a concise professional BIM pre-review report in the selected locale using only the supplied structured findings.
 
-Use only the supplied structured model summary and findings. Preserve every verdict, number, unit, rule identifier, IFC GlobalId and evidence classification exactly. Do not omit `REVIEW` findings. Group remediation by urgency, but do not add legal conclusions or new technical facts.
+- Preserve every GlobalId, status, observed value, required value, rule ID and evidence path exactly.
+- Do not add a finding, clause, measurement, count or recommendation unsupported by the JSON.
+- Distinguish failure, pass, review and non-applicability.
+- State when evidence is proxy or missing.
+- Use British English for English output.
+- End with the professional pre-review disclaimer.
+
+The report must pass the numerical and identifier verifier before it can be downloaded.
+

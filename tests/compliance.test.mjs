@@ -1,87 +1,73 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { analyseModel, candidateSamples, compareModels, demoModels, interpretRule, parseIfc } from "../lib/compliance.ts";
+import { analyseModel, buildReport, builtinRules, compareModels, parseIfc, proposeRule, resolveRuleProposal, verifyReport } from "../lib/compliance.ts";
 
-test("explicit clear-width evidence can pass or fail", () => {
-  const findings = analyseModel(demoModels.current);
-  const width = findings.filter((item) => item.ruleId === "EGRESS-WIDTH-001");
-  assert.equal(width.find((item) => item.elementName === "Rear exit D-03")?.status, "FAIL");
-  assert.equal(width.find((item) => item.elementName === "Main exit D-01")?.status, "PASS");
+const explicitDoorModel = (widthMm) => ({ id: "test", name: "Boundary fixture", filename: "boundary.ifc", schema: "IFC4", units: "mm", storeys: 1, source: "uploaded", spaces: [], doors: [{ expressId: 12, globalId: "2xQ7A1BOUNDARY000000001", name: "Exit D-01", widthMm, widthSource: "clear_width", isExit: true, fireRating: "FD60" }] });
+
+for (const [width, expected] of [[899, "FAIL"], [900, "PASS"], [901, "PASS"]]) test(`door-width boundary ${width} mm is ${expected}`, () => {
+  const result = analyseModel(explicitDoorModel(width)).find((item) => item.ruleId === "EGRESS-WIDTH-001");
+  assert.equal(result?.status, expected);
 });
 
-test("proxy measurements and missing applicability remain REVIEW", () => {
-  const findings = analyseModel(demoModels.uncertain);
-  const width = findings.filter((item) => item.ruleId === "EGRESS-WIDTH-001");
-  assert.equal(width.find((item) => item.elementName === "Lobby door")?.status, "REVIEW");
-  assert.equal(width.find((item) => item.elementName === "Door 01")?.status, "REVIEW");
+test("nominal OverallWidth remains REVIEW instead of becoming clear-width evidence", () => {
+  const model = explicitDoorModel(1200); model.doors[0].widthSource = "overall_width_proxy";
+  assert.equal(analyseModel(model)[0].status, "REVIEW");
 });
 
-test("non-exit doors are explicitly outside the width rule", () => {
-  const findings = analyseModel(demoModels.current);
-  assert.equal(findings.find((item) => item.ruleId === "EGRESS-WIDTH-001" && item.elementName === "Store D-04")?.status, "NOT_APPLICABLE");
+test("missing exit applicability remains REVIEW", () => {
+  const model = explicitDoorModel(900); model.doors[0].isExit = undefined;
+  assert.equal(analyseModel(model)[0].status, "REVIEW");
 });
 
-test("natural-language rules normalise metres and require a confirmed structure", () => {
-  const rule = interpretRule("Confirmed exit doors must provide at least 0.95 m clear width");
-  assert.equal(rule.threshold, 950);
-  assert.equal(rule.operator, ">=");
-  assert.equal(rule.field, "clearWidth");
+test("metres are normalised and an active conflict is surfaced", () => {
+  const result = proposeRule("Confirmed exit doors must provide at least 0.95 m clear width", builtinRules);
+  assert.equal(result.rule.threshold, 950); assert.equal(result.conflict.kind, "STRICTER"); assert.equal(result.feasibility.valid, true);
 });
 
-test("revision comparison uses stable IFC GlobalIds", () => {
-  const comparison = compareModels(demoModels.baseline, demoModels.current);
-  assert.equal(comparison.resolved, 1);
-  assert.equal(comparison.items.find((item) => item.name === "Main exit D-01")?.label, "Resolved");
+test("implausible numerical rules fail feasibility and cannot be silently accepted", () => {
+  const result = proposeRule("All exit doors must be at least 20 m wide", builtinRules);
+  assert.equal(result.feasibility.valid, false); assert.match(result.feasibility.issues.join(" "), /plausible/i);
 });
 
-test("the small IFC fixture exercises the upload parser", async () => {
-  const text = await readFile(new URL("../examples/assessment-door-sample.ifc", import.meta.url), "utf8");
-  const model = parseIfc(text, "assessment-door-sample.ifc");
-  assert.equal(model.schema, "IFC4");
-  assert.equal(model.storeys, 1);
-  assert.equal(model.doors.length, 3);
-  assert.equal(model.doors[0].widthMm, 820);
-  assert.equal(model.doors[0].widthSource, "overall_width_proxy");
+test("replace supersedes the prior active rule and activates an immutable new record", () => {
+  const result = proposeRule("Confirmed exit doors must provide at least 950 mm clear width", builtinRules);
+  const rules = resolveRuleProposal(result.rule, "replace", builtinRules);
+  assert.equal(rules.find((item) => item.id === "EGRESS-WIDTH-001")?.status, "SUPERSEDED");
+  assert.equal(rules.find((item) => item.id === result.rule.id)?.status, "ACTIVE");
 });
 
-test("the official buildingSMART sample is a safe no-door negative control", async () => {
-  const text = await readFile(new URL("../examples/buildingsmart-pcert-architecture.ifc", import.meta.url), "utf8");
-  const model = parseIfc(text, "buildingsmart-pcert-architecture.ifc");
-  assert.equal(model.schema, "IFC4");
-  assert.equal(model.storeys, 1);
-  assert.deepEqual(model.doors, []);
-  assert.deepEqual(analyseModel(model), []);
+test("version comparison uses stable GlobalIds", () => {
+  const before = explicitDoorModel(850); const after = explicitDoorModel(950);
+  const comparison = compareModels(before, after);
+  assert.equal(comparison.resolved, 1); assert.equal(comparison.items[0].id, before.doors[0].globalId);
 });
 
-test("candidate benchmarks run through one evidence policy", async () => {
-  const outcomes = {};
-  for (const sample of candidateSamples) {
-    const text = await readFile(new URL(`../public${sample.path}`, import.meta.url), "utf8");
-    const model = parseIfc(text, sample.name);
-    const findings = analyseModel(model);
-    outcomes[sample.id] = {
-      doors: model.doors.length,
-      fail: findings.filter((item) => item.status === "FAIL").length,
-      review: findings.filter((item) => item.status === "REVIEW").length,
-      pass: findings.filter((item) => item.status === "PASS").length,
-      na: findings.filter((item) => item.status === "NOT_APPLICABLE").length,
-    };
-  }
-  assert.deepEqual(outcomes.greatandyc, { doors: 4, fail: 1, review: 3, pass: 3, na: 1 });
-  assert.deepEqual(outcomes.waterywaterman, { doors: 14, fail: 0, review: 28, pass: 0, na: 0 });
-  assert.deepEqual(outcomes.mickey12go, { doors: 3, fail: 0, review: 6, pass: 0, na: 0 });
+test("the verified report contains every finding and only grounded numerical claims", () => {
+  const model = explicitDoorModel(850); const findings = analyseModel(model); const report = buildReport(model, findings, "en");
+  assert.deepEqual(verifyReport(report, findings), { valid: true, issues: [] });
 });
 
-test("IFC property-set relationships override nominal width with explicit evidence", async () => {
-  const text = await readFile(new URL("../public/samples/greatandyc-mixed-review.ifc", import.meta.url), "utf8");
-  const model = parseIfc(text, "mixed-review.ifc");
-  assert.deepEqual(model.doors[0], {
-    globalId: "20bkLQEujMYgVQIAyILyuh",
-    name: "Lobby Exit D-10",
-    widthMm: 950,
-    widthSource: "clear_width",
-    isExit: true,
-    fireRating: "60min",
-  });
+test("the numerical guard catches a hallucinated threshold", () => {
+  const model = explicitDoorModel(850); const findings = analyseModel(model); const report = buildReport(model, findings, "en").replaceAll("900 mm", "990 mm");
+  const result = verifyReport(report, findings); assert.equal(result.valid, false); assert.match(result.issues.join(" "), /990/);
 });
+
+test("the identifier guard catches an invented GlobalId", () => {
+  const model = explicitDoorModel(850); const findings = analyseModel(model); const report = buildReport(model, findings, "en").replace(model.doors[0].globalId, "3INVENTEDGLOBALID0000001");
+  const result = verifyReport(report, findings); assert.equal(result.valid, false); assert.match(result.issues.join(" "), /Missing GlobalId|Unknown identifier/);
+});
+
+test("real Duplex and Clinic samples preserve expected entity counts", async () => {
+  const duplex = parseIfc(await readFile(new URL("../public/samples/duplex-xeokit.ifc", import.meta.url), "utf8"), "duplex-xeokit.ifc", "sample");
+  const clinic = parseIfc(await readFile(new URL("../public/samples/medical-dental-clinic.ifc", import.meta.url), "utf8"), "medical-dental-clinic.ifc", "sample");
+  assert.deepEqual([duplex.doors.length, duplex.spaces.length], [14, 21]); assert.deepEqual([clinic.doors.length, clinic.spaces.length], [254, 269]);
+});
+
+test("official IFC4 negative control does not invent targets or findings", async () => {
+  const model = parseIfc(await readFile(new URL("../public/samples/buildingsmart-pcert-architecture.ifc", import.meta.url), "utf8"), "pcert.ifc", "sample");
+  assert.match(model.schema, /^IFC4/); assert.equal(model.doors.length, 0); assert.deepEqual(analyseModel(model), []);
+});
+
+test("malformed and disguised input is rejected", () => assert.throws(() => parseIfc("<script>alert(1)</script>", "model.ifc"), /not a readable IFC/i));
+

@@ -1,102 +1,91 @@
 # Evidence Agent
 
-**An evidence-first IFC compliance pre-review agent.** Upload a model, run two deterministic checks, inspect every decision against its IFC evidence, compare revisions and ask the Agent to turn a natural-language project requirement into a rule proposal that only becomes active after human confirmation.
+Evidence Agent is an evidence-first BIM compliance workspace for IFC pre-review. It combines a real browser-based IFC viewer, deterministic compliance rules, document-to-rule extraction, human approval, project memory, revision comparison and numerically guarded bilingual reports.
 
-> Evidence Agent is a technical-assessment prototype. It supports professional pre-review; it does not certify statutory compliance or replace a suitably qualified reviewer.
+> The application supports professional pre-review. It does not certify statutory compliance or replace approved plans or a suitably qualified professional.
 
-## Why this prototype exists
+## Assessment path
 
-BIM compliance tools often fail in one of two ways: they produce a confident verdict from incomplete model data, or they use an LLM where a reproducible rule is required. Evidence Agent treats uncertainty as a first-class result.
+The complete demonstration works without an API key:
 
-- Deterministic code owns `PASS`, `FAIL`, `REVIEW` and `NOT_APPLICABLE`.
-- A nominal `IfcDoor.OverallWidth` is labelled as a proxy; it cannot silently become a clear-opening measurement.
-- Missing exit-door applicability remains `REVIEW`; names and geometry are not used to guess design intent.
-- The Agent explains evidence, asks for missing information and proposes controlled project rules. It cannot rewrite findings.
+1. Load the small, licensed **Duplex residence** sample or upload an IFC2x3/IFC4 file.
+2. Orbit, pan and zoom the real IFC geometry; use X-ray and section controls.
+3. Run two deterministic checks and select a finding to focus its IFC element by GlobalId.
+4. Propose a natural-language rule. The Agent checks feasibility and the active catalogue before asking whether to replace the existing rule, keep both with distinct scope, or cancel.
+5. Upload a PDF, DOCX, XLSX, CSV, IDS, IFC, DXF or text rule source. Preview it and send extracted numerical clauses to conflict review.
+6. Inspect the plan–act–verify trace, project memory and provider registry.
+7. Generate an English or Chinese report. Export is enabled only after every identifier and numerical claim passes verification.
 
-## Assessment scope
+## Deterministic rules
 
-The prototype implements two built-in checks:
+| Rule | Evidence policy |
+| --- | --- |
+| `EGRESS-WIDTH-001` | Applies only where exit-door applicability is explicit. `Pset_DoorCommon.ClearWidth` may pass or fail; nominal `IfcDoor.OverallWidth` remains a proxy and therefore `REVIEW`. The 900 mm value is an assessment parameter, not a universal statutory threshold. |
+| `INFO-001` | Checks door name, applicability, width provenance and fire-rating evidence for confirmed exits. Missing information is `REVIEW`, never an invented failure or pass. |
 
-| Rule | Purpose | Assessment parameter |
-| --- | --- | --- |
-| `EGRESS-WIDTH-001` | Check the evidenced clear width of explicitly confirmed exit doors | 900 mm demonstration threshold |
-| `INFO-001` | Check door name, applicability, width provenance and fire-rating evidence | Evidence-completeness policy |
+LLMs may explain, extract and suggest. They never own `PASS`, `FAIL`, `REVIEW` or `NOT_APPLICABLE`.
 
-The 900 mm threshold demonstrates the checking architecture. It is not presented as a universally applicable statutory requirement.
+## Real assessment samples
 
-## Product capabilities
+The product contains no candidate benchmark section. Three open-source models cover fast interaction, performance and negative applicability:
 
-- IFC2x3 and IFC4 STEP upload, processed locally in the browser.
-- A compact evidence map with finding selection and GlobalId traceability.
-- Explicit reliability states: `EXPLICIT`, `PROXY`, `MISSING` and `DERIVED`.
-- A four-state finding model that separates uncertainty from failure.
-- GlobalId-based comparison of two model revisions.
-- Natural-language project-rule interpretation with a mandatory human confirmation gate.
-- Faithful English and Chinese Markdown reports.
-- Three assessment scenarios: revised clinic, failing baseline and evidence gaps.
-- A 225 KB official buildingSMART IFC4 sample as a licensed no-door negative control.
-- Three attributed candidate benchmark IFC files, reviewed under one independent evidence policy.
-- Responsive, keyboard-accessible interface with no API key required for the deterministic demonstration.
+- xeokit Duplex residence — Apache-2.0, 14 doors and 21 spaces.
+- BSI (2020) Medical-Dental Test Files, buildingSMART International — CC BY 4.0, 254 doors and 269 spaces.
+- buildingSMART PCERT Architecture — CC BY 4.0 IFC4 negative control.
 
-## Quick start
+See [`public/samples/manifest.json`](public/samples/manifest.json) for exact source URLs, licences, hashes and expected counts. CI verifies every redistributed byte.
 
-Requirements: Node.js 22.13 or later.
+## Rule sources and copyright
+
+The Hong Kong Buildings Department and Development Bureau entries are official links. Their full documents are not copied into this public repository because government copyright terms restrict republication. Users may upload an authorised copy for private, in-browser preview and extraction.
+
+Extracted clauses remain `DRAFT`. A source page, sheet or text segment is retained, and a user must approve any activation.
+
+## Agent architecture
+
+- Review Orchestrator — bounded plan and hand-offs.
+- Model Intake — schema, units, entity and GlobalId evidence.
+- Document Intelligence — private parsing and candidate-rule extraction.
+- Rule Agent — conflict, plausibility, scope and unit checks.
+- Deterministic Rule Engine — verdict authority.
+- Evidence Verifier — identifier and numerical guardrail.
+- Report Agent — faithful English, Chinese or prompt-based narrative.
+
+Project memory is device-local, inspectable and erasable. It stores approved rules and decisions, never API keys, and cannot bypass approval. Optional provider entries are deliberately separated from rule truth; the local path always remains available.
+
+## Development
+
+Requires Node.js 22.13 or later.
 
 ```bash
 npm ci
 npm run dev
 ```
 
-Open the local URL shown in the terminal. Select **Harbour Clinic · R02**, run the evidence review, inspect a `FAIL` or `REVIEW` finding, compare R01 with R02, then propose a 950 mm project rule in **Rule studio**.
-
-For comparative assessment, select any item under **Candidate benchmarks**, run the review, then open **Compare** to inspect the aggregate benchmark table. Raw counts must be interpreted in context: a synthetic failure fixture and a realistic model with missing compliance properties are testing different things.
-
-## Verification
+Quality gates:
 
 ```bash
-npm run build
-npm test
-npm run lint
+npm run quality
 ```
 
-## Repository structure
+The command runs linting, strict type checking, a production build and the complete deterministic test suite. The same gate runs on every push and pull request.
+
+## Repository map
 
 ```text
-app/                  Product interface
-lib/compliance.ts     Normalised evidence, deterministic rules and IFC intake
-prompts/              Agent, project-rule and report contracts
-examples/             Small IFC fixtures and provenance notes
-public/samples/        Licensed candidate benchmark files and attribution
-docs/                 Architecture and assessment mapping
-tests/                Deployed-render smoke tests
-.openai/hosting.json  Sites deployment metadata
+app/                         Bilingual product interface
+components/IfcViewer.tsx     Real web-ifc + Three.js evidence viewer
+lib/compliance.ts            IFC evidence, rules, conflicts, reports and guardrails
+lib/document-intelligence.ts Rule-source parsing and official-source registry
+lib/memory.ts                Device-local project and audit memory
+lib/agent.ts                 Provider registry and transparent orchestration trace
+public/samples/               Licensed real IFC assessment models
+prompts/                      Public Agent contracts
+tests/                        Boundary, sample, security, licence and hallucination tests
+docs/                         Architecture, SSD and assessment evidence
 ```
-
-## IFC boundary
-
-The current browser slice extracts a controlled subset of IFC STEP evidence: schema, project, storey count, `IfcDoor` identity, name and nominal width. Uploaded `OverallWidth` values remain proxies. The visual evidence map is explicitly abstract and does not claim to reconstruct IFC geometry.
-
-A production implementation should place IfcOpenShell or web-ifc behind the same normalised evidence contract to resolve property sets, units, spatial relationships and geometry. This honest boundary is preferable to fabricating positions or treating nominal dimensions as verified clear openings.
-
-## Agent boundary
-
-The checked-in prompts are public and reviewable. The hosted assessment path uses a deterministic local interpreter, so the walkthrough cannot fail because of a missing model API. A production LLM adapter may replace the interpreter only if it returns the same allowlisted structure, preserves the confirmation gate and never receives verdict authority.
-
-## Privacy and security
-
-- Uploaded models remain in the browser session and are not persisted by the application.
-- No API key is required or accepted by the assessment interface.
-- IFC input is treated as untrusted text; the prototype does not execute embedded content.
-- Reports contain derived findings and identifiers, so reviewers should still follow the project information-security policy.
-
-## Further reading
-
-- [Architecture](docs/ARCHITECTURE.md)
-- [Assessment mapping](docs/ASSESSMENT_MAPPING.md)
-- [Agent system prompt](prompts/system.md)
-- [Controlled rule prompt](prompts/interpret-project-rule.md)
-- [Faithful report prompt](prompts/report.md)
 
 ## Licence
 
-Code is released under the MIT Licence. External sample models retain their original licences and attribution.
+Application code is MIT licensed. External IFC models and web-ifc retain their own licences and attribution; see `licences/` and the sample manifest.
+

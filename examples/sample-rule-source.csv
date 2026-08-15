@@ -1,0 +1,3 @@
+rule_id,title,requirement,authority,scope
+DEMO-DW-01,Exit door clear width,Confirmed exit doors shall provide a minimum clear width of 0.90 m,Assessment demonstration,Confirmed exit doors
+DEMO-INFO-01,Door information,Every door must provide a name and fire-rating information where applicable,Assessment evidence policy,All IfcDoor elements

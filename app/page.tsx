@@ -1,313 +1,125 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import {
-  analyseModel,
-  buildReport,
-  candidateSamples,
-  compareModels,
-  demoModels,
-  interpretRule,
-  parseIfc,
-  type BuildingModel,
-  type ConfirmedRule,
-  type Finding,
+  analyseModel, assessmentSamples, buildReport, builtinRules, compareModels, parseIfc, proposeRule, resolveRuleProposal, verifyReport,
+  type BuildingModel, type Finding, type Locale, type RuleDefinition,
 } from "../lib/compliance";
+import { officialRuleSources, readRuleDocument, type RuleDocument } from "../lib/document-intelligence";
+import { audit, clearMemory, emptyMemory, loadMemory, saveMemory, type AuditEvent, type ProjectMemory } from "../lib/memory";
+import { providers, reviewTrace } from "../lib/agent";
 
-type View = "review" | "compare" | "rules" | "report";
-type Language = "en" | "zh";
+const IfcViewer = dynamic(() => import("../components/IfcViewer"), { ssr: false, loading: () => <div className="viewer-loading">Loading the IFC evidence viewer…</div> });
+type View = "review" | "compare" | "rules" | "sources" | "agents" | "report";
 
-const labels = {
+const copy = {
   en: {
-    review: "Review",
-    compare: "Compare",
-    rules: "Rule studio",
-    report: "Report",
-    run: "Run evidence review",
-  },
+    nav: { review: "Review", compare: "Compare", rules: "Rule studio", sources: "Sources", agents: "Agent trace", report: "Report" },
+    strap: "IFC compliance workspace", upload: "Upload an IFC model", uploadHint: "IFC2x3 or IFC4 · processed in this browser", samples: "Assessment samples", activePack: "Active rule pack", activeText: "Human-approved deterministic checks. Demonstration thresholds are not statutory certification.", inspect: "Inspect rules", run: "Run evidence review", running: "Reviewing evidence…", evidenceMap: "Evidence map", viewerHint: "Interactive IFC geometry · orbit, pan, zoom, section and inspect", findings: "Review findings", ready: "Ready to run", checks: "checks completed", evidenceReady: "Evidence is ready", evidenceReadyText: "Run the review to evaluate the approved rules without asking an AI to guess.", observed: "Observed", required: "Required", evidence: "Evidence", reliability: "Reliability", next: "Agent next step", project: "PROJECT", preReview: "PRE-REVIEW", modelEvidence: "Evidence extracted from the IFC model", fail: "Fail", review: "Review", pass: "Pass", na: "N/A", disclaimer: "Professional pre-review only · plans and qualified professional judgement prevail", compareTitle: "Compare model revisions", compareLead: "Upload or select two IFC revisions. GlobalIds anchor the evidence diff; unmatched identifiers are reported as new elements.", baseline: "Baseline IFC", current: "Current IFC", changed: "Changed", resolved: "Resolved", regressed: "Regressed", unchanged: "Unchanged", element: "Element", before: "Before", after: "After", outcome: "Outcome", ruleTitle: "Rule studio", ruleLead: "Describe a requirement. The Agent checks feasibility and existing rules before asking you to replace, retain with a distinct scope, or cancel.", proposed: "Proposed requirement", analyse: "Analyse proposal", feasibility: "Feasibility", conflict: "Existing-rule check", advice: "Customisation prompts", replace: "Replace existing rule", keep: "Keep both with a distinct scope", cancel: "Cancel", catalogue: "Rule catalogue", active: "Active", draft: "Draft", sourceTitle: "Rule-source library", sourceLead: "Upload a regulation or project requirement, preview the original and turn traceable passages into draft rules.", uploadRule: "Upload a rule-source file", formats: "PDF, DOCX, XLSX, CSV, IDS, IFC, DXF and text", original: "Original preview", extractedRules: "Extracted rule catalogue", noDoc: "Upload a file to open its private preview and extracted catalogue.", official: "Official Hong Kong source registry", officialNote: "Official documents are linked, not redistributed. Confirm the current edition and copyright terms at source.", openSource: "Open official source", importRule: "Send to conflict review", agentTitle: "Transparent Agent workspace", agentLead: "A bounded plan–act–verify architecture. The trace shows evidence, tools and decisions—not hidden chain-of-thought.", memory: "Project memory", memoryText: "Stores approved rules, decisions and preferences on this device. It cannot silently approve a rule.", clear: "Clear project memory", providers: "Provider registry", trace: "Execution trace", noTrace: "Run a review or analyse a rule to create a trace.", reportTitle: "Verified review report", reportLead: "The narrative is generated only from deterministic findings, then checked for unknown numbers and identifiers.", download: "Download Markdown", verification: "Report verification", valid: "Verified", blocked: "Blocked", prompt: "Suggested review prompt", copyPrompt: "Copy prompt", noReport: "Run a review to generate a bilingual evidence report.", loaded: "loaded", doors: "doors", spaces: "spaces", licence: "Licence", source: "Source", decisionNeeded: "Human decision required", noApplicable: "This valid IFC contains no reviewable doors for the active pack.", local: "Evidence-bound", lang: "Language" },
   zh: {
-    review: "审查",
-    compare: "版本对比",
-    rules: "规则工作室",
-    report: "报告",
-    run: "运行证据审查",
-  },
-};
+    nav: { review: "审查", compare: "版本对比", rules: "规则工作室", sources: "规则来源", agents: "Agent 轨迹", report: "报告" },
+    strap: "IFC 合规工作空间", upload: "上传 IFC 模型", uploadHint: "IFC2x3 或 IFC4 · 在本浏览器处理", samples: "评估样本", activePack: "启用的规则包", activeText: "经人工确认的确定性检查。演示阈值不构成法定认证。", inspect: "查看规则", run: "运行证据审查", running: "正在审查证据…", evidenceMap: "证据地图", viewerHint: "交互式 IFC 几何 · 旋转、平移、缩放、剖切与查看", findings: "审查结果", ready: "可以开始", checks: "项检查已完成", evidenceReady: "证据已就绪", evidenceReadyText: "运行审查，以已批准规则进行判断，不让 AI 猜测。", observed: "观测值", required: "要求", evidence: "证据", reliability: "可靠性", next: "Agent 下一步", project: "项目", preReview: "预审", modelEvidence: "证据已从 IFC 模型提取", fail: "不通过", review: "需复核", pass: "通过", na: "不适用", disclaimer: "仅供专业预审 · 正式图则与合资格专业判断优先", compareTitle: "比较模型版本", compareLead: "上传或选择两个 IFC 版本。系统使用 GlobalId 关联证据差异，无法匹配的标识将列为新构件。", baseline: "基线 IFC", current: "当前 IFC", changed: "已变化", resolved: "已解决", regressed: "新增问题", unchanged: "未变化", element: "构件", before: "修改前", after: "修改后", outcome: "结果", ruleTitle: "规则工作室", ruleLead: "描述检查要求。Agent 会先检查可行性和现有规则，再请您选择替换、分范围并存或取消。", proposed: "建议规则", analyse: "分析建议", feasibility: "可行性", conflict: "现有规则检查", advice: "定制建议", replace: "替换现有规则", keep: "保留两者并设置不同范围", cancel: "取消", catalogue: "规则目录", active: "已启用", draft: "草稿", sourceTitle: "规则来源库", sourceLead: "上传规范或项目要求，预览原文件，并把可追溯条文转为规则草稿。", uploadRule: "上传规则来源文件", formats: "PDF、DOCX、XLSX、CSV、IDS、IFC、DXF 及文本", original: "原文件预览", extractedRules: "提取的规则目录", noDoc: "请上传文件，以打开私有预览和提取的规则目录。", official: "香港官方来源注册表", officialNote: "平台只提供官方链接，不重新分发完整文件。请在来源处确认现行版本与版权条款。", openSource: "打开官方来源", importRule: "送至冲突审查", agentTitle: "透明 Agent 工作空间", agentLead: "采用有边界的计划—执行—验证架构。轨迹展示证据、工具和决策，不展示隐藏思维链。", memory: "项目记忆", memoryText: "在本设备保存已批准规则、决策和偏好，不能静默批准规则。", clear: "清除项目记忆", providers: "供应商注册表", trace: "执行轨迹", noTrace: "运行审查或分析规则后将生成轨迹。", reportTitle: "已验证审查报告", reportLead: "报告只能依据确定性检查结果生成，并检查未知数值和构件标识。", download: "下载 Markdown", verification: "报告验证", valid: "已验证", blocked: "已阻止", prompt: "检查报告提示词", copyPrompt: "复制提示词", noReport: "请先运行审查，以生成双语证据报告。", loaded: "已载入", doors: "扇门", spaces: "个空间", licence: "许可证", source: "来源", decisionNeeded: "需要人工决策", noApplicable: "该 IFC 文件有效，但启用规则包中没有可审查的门。", local: "证据约束", lang: "语言" },
+} as const;
 
-function StatusPill({ status }: { status: Finding["status"] }) {
-  return <span className={`status status-${status.toLowerCase()}`}>{status.replace("_", " ")}</span>;
+const blankModel: BuildingModel = { id: "empty", name: "No model", filename: "", schema: "—", units: "unresolved", storeys: 0, source: "sample", doors: [], spaces: [] };
+const zhRuleText = "已确认的疏散门净宽不得小于 0.95 米";
+const localiseRuleText = (value: string) => ({
+  "Add the jurisdiction, source clause, occupancy and any exceptions before approval.": "批准前请补充法域、来源条文、建筑用途及例外。",
+  "No measurable numerical threshold was found.": "未找到可测量的数值阈值。",
+  "The threshold is outside a plausible door-width range (300–3,000 mm); check the unit or decimal place.": "阈值超出合理门宽范围（300–3,000 毫米）；请检查单位或小数位。",
+  "The target element is unclear; specify doors or a more precise IFC entity.": "目标构件不明确；请指定门或更精确的 IFC 实体。",
+  "Define whether the rule applies to exit doors, all doors, or a named classification.": "请说明规则适用于疏散门、所有门或指定分类。",
+}[value] ?? value);
+const localiseScope = (value: string) => ({ "Doors explicitly classified as exits": "明确分类为疏散门的构件", "All IfcDoor elements": "所有 IfcDoor 构件", "Confirmed exit doors": "已确认的疏散门", "Scope requires confirmation": "适用范围需要确认", "Project-specific exit doors; scope confirmed by the user": "用户已确认范围的项目疏散门" }[value] ?? value);
+
+function Status({ value, locale }: { value: Finding["status"]; locale: Locale }) {
+  const text = locale === "zh" ? { PASS: "通过", FAIL: "不通过", REVIEW: "需复核", NOT_APPLICABLE: "不适用" }[value] : value.replace("_", " ");
+  return <span className={`status status-${value.toLowerCase()}`}>{text}</span>;
 }
 
 export default function Home() {
-  const [view, setView] = useState<View>("review");
-  const [language, setLanguage] = useState<Language>("en");
-  const [model, setModel] = useState<BuildingModel>(demoModels.current);
-  const [baseline, setBaseline] = useState<BuildingModel>(demoModels.baseline);
-  const [findings, setFindings] = useState<Finding[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [ran, setRan] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState("");
-  const [ruleText, setRuleText] = useState("Flag confirmed exit doors with a clear width below 950 mm");
-  const [draftRule, setDraftRule] = useState<ConfirmedRule | null>(null);
-  const [confirmedRules, setConfirmedRules] = useState<ConfirmedRule[]>([]);
-  const [candidateModels, setCandidateModels] = useState<BuildingModel[]>([]);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [view, setView] = useState<View>("review"); const [locale, setLocale] = useState<Locale>("en"); const t = copy[locale];
+  const [model, setModel] = useState<BuildingModel>(blankModel); const [baseline, setBaseline] = useState<BuildingModel>(blankModel); const [modelSource, setModelSource] = useState<string | ArrayBuffer | null>(null); const [findings, setFindings] = useState<Finding[]>([]); const [selectedId, setSelectedId] = useState<string>(); const [busy, setBusy] = useState(false); const [toast, setToast] = useState("");
+  const [rules, setRules] = useState<RuleDefinition[]>(builtinRules); const [ruleText, setRuleText] = useState("Confirmed exit doors must provide at least 0.95 m clear width"); const [proposal, setProposal] = useState<ReturnType<typeof proposeRule>>(); const [document, setDocument] = useState<RuleDocument>(); const [docBusy, setDocBusy] = useState(false); const [events, setEvents] = useState<AuditEvent[]>([]); const [memory, setMemory] = useState<ProjectMemory>(() => emptyMemory()); const [provider, setProvider] = useState("local");
+  const modelFile = useRef<HTMLInputElement>(null); const baselineFile = useRef<HTMLInputElement>(null); const ruleFile = useRef<HTMLInputElement>(null);
 
-  const copy = labels[language];
-  const summary = useMemo(() => ({
-    pass: findings.filter((f) => f.status === "PASS").length,
-    fail: findings.filter((f) => f.status === "FAIL").length,
-    review: findings.filter((f) => f.status === "REVIEW").length,
-    na: findings.filter((f) => f.status === "NOT_APPLICABLE").length,
-  }), [findings]);
-  const selected = findings.find((finding) => finding.id === selectedId) ?? findings[0];
-  const comparison = useMemo(() => compareModels(baseline, model), [baseline, model]);
-  const allModels = useMemo(() => [...Object.values(demoModels), ...candidateModels], [candidateModels]);
-  const benchmarkRows = useMemo(() => candidateModels.map((candidate) => {
-    const results = analyseModel(candidate);
-    return {
-      model: candidate,
-      fail: results.filter((item) => item.status === "FAIL").length,
-      review: results.filter((item) => item.status === "REVIEW").length,
-      pass: results.filter((item) => item.status === "PASS").length,
-      na: results.filter((item) => item.status === "NOT_APPLICABLE").length,
-    };
-  }), [candidateModels]);
+  useEffect(() => { queueMicrotask(() => { const remembered = loadMemory(); setMemory(remembered); if (remembered.rules.length) setRules([...builtinRules, ...remembered.rules]); }); void loadSample(assessmentSamples[0], true); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const selected = findings.find((item) => item.id === selectedId) ?? findings[0]; const activeRules = rules.filter((rule) => rule.status === "ACTIVE");
+  const summary = useMemo(() => Object.fromEntries(["FAIL", "REVIEW", "PASS", "NOT_APPLICABLE"].map((status) => [status, findings.filter((item) => item.status === status).length])) as Record<Finding["status"], number>, [findings]);
+  const comparison = useMemo(() => compareModels(baseline, model, rules), [baseline, model, rules]); const report = useMemo(() => buildReport(model, findings, locale), [model, findings, locale]); const verification = useMemo(() => findings.length ? verifyReport(report, findings) : { valid: false, issues: [] }, [report, findings]);
+  const prompt = `模型名称：${model.name}\n单位：${model.units}\n检查规则：${activeRules.map((rule) => `${rule.title.zh}${rule.threshold ? `（≥${rule.threshold}mm）` : ""}`).join("；")}\n\n规则引擎输出的违规清单（JSON）：\n${JSON.stringify(findings.filter((finding) => finding.status === "FAIL" || finding.status === "REVIEW"), null, 2)}\n\n请根据上述清单生成检查报告。不得增加 JSON 中不存在的违规或数值。`;
+  const flash = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 2600); };
+  const changeLocale = (next: Locale) => { setLocale(next); setRuleText((current) => current === "Confirmed exit doors must provide at least 0.95 m clear width" && next === "zh" ? zhRuleText : current === zhRuleText && next === "en" ? "Confirmed exit doors must provide at least 0.95 m clear width" : current); if (findings.length) { const translated = analyseModel(model, rules, next); setFindings(translated); setSelectedId((current) => translated.find((item) => item.id === current)?.id ?? translated[0]?.id); } };
 
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all(candidateSamples.map(async (sample) => {
-      const response = await fetch(sample.path);
-      const parsed = parseIfc(await response.text(), sample.name);
-      return { ...parsed, id: sample.id, name: `${sample.label} · ${sample.name}`, provenance: `${sample.note} · ${sample.licence}` };
-    })).then((loaded) => { if (!cancelled) setCandidateModels(loaded); }).catch(() => undefined);
-    return () => { cancelled = true; };
-  }, []);
+  async function loadSample(sample: typeof assessmentSamples[number], initial = false) {
+    try { const response = await fetch(sample.path); const buffer = await response.arrayBuffer(); const parsed = parseIfc(new TextDecoder().decode(buffer), sample.filename, "sample"); const enriched = { ...parsed, id: sample.id, name: sample.label[locale], provenance: sample.note[locale], licence: sample.licence, sourceUrl: sample.sourceUrl }; setModel(enriched); setModelSource(buffer); if (initial || baseline.id === "empty") setBaseline(enriched); setFindings([]); if (!initial) flash(`${sample.label[locale]} ${t.loaded}`); }
+    catch (error) { flash(error instanceof Error ? error.message : "Sample could not be loaded."); }
+  }
 
-  const runReview = () => {
-    setBusy(true);
-    window.setTimeout(() => {
-      const next = analyseModel(model, confirmedRules);
-      setFindings(next);
-      setSelectedId(next.find((item) => item.status === "FAIL")?.id ?? next[0]?.id ?? null);
-      setRan(true);
-      setBusy(false);
-      setToast(`Review complete · ${next.length} traceable findings`);
-      window.setTimeout(() => setToast(""), 2600);
-    }, 520);
-  };
+  async function loadIfc(file: File | undefined, target: "current" | "baseline") {
+    if (!file) return; try { const buffer = await file.arrayBuffer(); const parsed = parseIfc(new TextDecoder().decode(buffer), file.name); if (target === "baseline") setBaseline(parsed); else { setModel(parsed); setModelSource(buffer); setFindings([]); } flash(`${file.name} ${t.loaded}`); } catch (error) { flash(error instanceof Error ? error.message : "IFC could not be read."); }
+  }
 
-  const loadIfcFile = async (file?: File) => {
-    if (!file) return;
-    const text = await file.text();
-    const parsed = parseIfc(text, file.name);
-    setModel(parsed);
-    setFindings([]);
-    setRan(false);
-    setToast(`Loaded ${parsed.doors.length} doors from ${file.name}`);
-    window.setTimeout(() => setToast(""), 2600);
-  };
+  function runReview() {
+    setBusy(true); window.setTimeout(() => { const results = analyseModel(model, rules, locale); setFindings(results); setSelectedId(results.find((item) => item.status === "FAIL")?.id ?? results.find((item) => item.status === "REVIEW")?.id ?? results[0]?.id); const trace = reviewTrace(model.name, activeRules.length, results.length, locale); setEvents((current) => [...trace, ...current].slice(0, 80)); setBusy(false); flash(locale === "zh" ? `审查完成 · ${results.length} 项可追溯结果` : `Review complete · ${results.length} traceable findings`); }, 180);
+  }
 
-  const loadDemo = (key: keyof typeof demoModels) => {
-    setModel(demoModels[key]);
-    setFindings([]);
-    setRan(false);
-    setToast(`${demoModels[key].name} loaded`);
-    window.setTimeout(() => setToast(""), 2200);
-  };
+  function inspectProposal(text = ruleText) {
+    const result = proposeRule(text, rules); setProposal(result); setEvents((current) => [audit("rule-agent", "conflict-check", `${result.conflict.kind}: ${result.conflict.summary[locale]}`, `${locale === "zh" ? "可行性" : "Feasibility"} ${result.feasibility.score}/100`), ...current]);
+  }
 
-  const loadCandidate = (candidate: BuildingModel) => {
-    setModel(candidate);
-    setFindings([]);
-    setRan(false);
-    setToast(`${candidate.name} loaded for independent review`);
-    window.setTimeout(() => setToast(""), 2400);
-  };
+  function decide(action: "replace" | "keep" | "cancel") {
+    if (!proposal) return; if (action !== "cancel" && !proposal.feasibility.valid) { flash(locale === "zh" ? "规则尚不可执行，请先修正可行性问题。" : "The rule is not executable yet; resolve the feasibility issues first."); return; }
+    const next = resolveRuleProposal(proposal.rule, action, rules); setRules(next); setProposal(undefined);
+    if (action !== "cancel") { const approved = next.filter((item) => item.id === proposal.rule.id && item.status === "ACTIVE"); const nextMemory = { ...memory, rules: [...memory.rules.filter((item) => item.id !== proposal.rule.id), ...approved], decisions: [...memory.decisions, { at: new Date().toISOString(), decision: action, ruleId: proposal.rule.id }], events: [audit("user", "rule-approval", `${action}: ${proposal.rule.id}`), ...memory.events] }; setMemory(nextMemory); saveMemory(nextMemory); }
+    flash(action === "cancel" ? (locale === "zh" ? "已取消规则建议" : "Proposal cancelled") : (locale === "zh" ? "规则已由人工确认并启用" : "Rule approved and activated by the user"));
+  }
 
-  const downloadReport = () => {
-    const report = buildReport(model, findings, language);
-    const blob = new Blob([report], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${model.name.replace(/\W+/g, "-").toLowerCase()}-${language}-review.md`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  };
+  async function loadRuleFile(file?: File) {
+    if (!file) return; setDocBusy(true); try { const next = await readRuleDocument(file); if (document?.previewUrl) URL.revokeObjectURL(document.previewUrl); setDocument(next); setEvents((current) => [audit("document-agent", "document-extraction", locale === "zh" ? `已读取 ${file.name}；提取 ${next.rules.length} 条候选规则。` : `Read ${file.name}; extracted ${next.rules.length} candidate rules.`, `SHA-256 ${next.hash}`), ...current]); flash(locale === "zh" ? `已提取 ${next.rules.length} 条候选规则` : `${next.rules.length} candidate rules extracted`); } catch (error) { flash(error instanceof Error ? error.message : "Document could not be read."); } finally { setDocBusy(false); }
+  }
 
-  return (
-    <main className="app-shell">
-      <header className="topbar">
-        <button className="brand" onClick={() => setView("review")} aria-label="Go to review workspace">
-          <span className="brand-mark">EA</span>
-          <span><strong>Evidence Agent</strong><small>IFC compliance pre-review</small></span>
-        </button>
-        <nav aria-label="Workspace views">
-          {(["review", "compare", "rules", "report"] as View[]).map((item) => (
-            <button key={item} className={view === item ? "active" : ""} onClick={() => setView(item)}>
-              {copy[item]}
-              {item === "compare" && comparison.changed > 0 && <em>{comparison.changed}</em>}
-            </button>
-          ))}
-        </nav>
-        <div className="header-actions">
-          <div className="language-switch" aria-label="Report language">
-            <button className={language === "en" ? "selected" : ""} onClick={() => setLanguage("en")}>EN</button>
-            <button className={language === "zh" ? "selected" : ""} onClick={() => setLanguage("zh")}>中文</button>
-          </div>
-          <span className="local-badge"><i /> Evidence-bound</span>
-        </div>
-      </header>
+  function downloadReport() { if (!verification.valid) return; const blob = new Blob([report], { type: "text/markdown" }); const url = URL.createObjectURL(blob); const anchor = globalThis.document.createElement("a"); anchor.href = url; anchor.download = `${model.name.replace(/\W+/g, "-").toLowerCase()}-${locale}-report.md`; anchor.click(); URL.revokeObjectURL(url); }
+  const pickFinding = (globalId: string) => { const finding = findings.find((item) => item.elementId === globalId); if (finding) setSelectedId(finding.id); };
 
-      {view === "review" && (
-        <section className="workspace">
-          <aside className="rail">
-            <div className="eyebrow">MODEL INTAKE</div>
-            <button className="upload" onClick={() => fileRef.current?.click()}>
-              <span>↑</span><strong>Upload an IFC model</strong><small>IFC2x3, IFC4 · local processing</small>
-            </button>
-            <input ref={fileRef} hidden type="file" accept=".ifc,text/plain" onChange={(event) => loadIfcFile(event.target.files?.[0])} />
-            <div className="sample-title"><span>Assessment samples</span><span>3</span></div>
-            {(Object.keys(demoModels) as (keyof typeof demoModels)[]).map((key) => (
-              <button className={`sample ${model.id === demoModels[key].id ? "current" : ""}`} key={key} onClick={() => loadDemo(key)}>
-                <span className="file-icon">IFC</span>
-                <span><strong>{demoModels[key].name}</strong><small>{demoModels[key].doors.length} doors · {demoModels[key].schema}</small></span>
-              </button>
-            ))}
-            <div className="sample-title"><span>Candidate benchmarks</span><span>{candidateModels.length}/3</span></div>
-            {candidateModels.map((candidate) => (
-              <button className={`sample ${model.id === candidate.id ? "current" : ""}`} key={candidate.id} onClick={() => loadCandidate(candidate)}>
-                <span className="file-icon">IFC</span>
-                <span><strong>{candidate.name}</strong><small>{candidate.doors.length} doors · {candidate.schema}</small></span>
-              </button>
-            ))}
-            <div className="scope-card">
-              <div className="eyebrow">ACTIVE RULE PACK</div>
-              <strong>Assessment evidence profile</strong>
-              <p>Two deterministic checks. Thresholds are demonstration parameters, not statutory certification.</p>
-              <button onClick={() => setView("rules")}>Inspect rules →</button>
-            </div>
-          </aside>
+  return <main className="app-shell">
+    <header className="topbar">
+      <button className="brand" onClick={() => setView("review")} aria-label="Review workspace"><span className="brand-mark">EA</span><span><strong>Evidence Agent</strong><small>{t.strap}</small></span></button>
+      <nav aria-label="Workspace views">{(["review", "compare", "rules", "sources", "agents", "report"] as View[]).map((item) => <button key={item} className={view === item ? "active" : ""} onClick={() => setView(item)}>{t.nav[item]}{item === "compare" && comparison.changed > 0 ? <em>{comparison.changed}</em> : null}</button>)}</nav>
+      <div className="header-actions"><div className="language-switch" aria-label={t.lang}><button className={locale === "en" ? "selected" : ""} onClick={() => changeLocale("en")}>EN</button><button className={locale === "zh" ? "selected" : ""} onClick={() => changeLocale("zh")}>中文</button></div><span className="local-badge"><i /> {t.local}</span></div>
+    </header>
 
-          <section className="review-main">
-            <div className="model-heading">
-              <div>
-                <span className="breadcrumb">PROJECT / {model.schema} / PRE-REVIEW</span>
-                <h1>{model.name}</h1>
-                <p>{model.doors.length} doors · {model.storeys} storeys · Evidence extracted {model.source === "uploaded" ? "from IFC STEP" : "from a controlled sample"}</p>
-                {model.provenance && <p className="provenance">{model.provenance}</p>}
-              </div>
-              <button className="primary" onClick={runReview} disabled={busy}>{busy ? "Reviewing evidence…" : copy.run}</button>
-            </div>
+    {view === "review" && <section className="workspace">
+      <aside className="rail">
+        <div className="eyebrow">{locale === "zh" ? "模型导入" : "MODEL INTAKE"}</div>
+        <button className="upload" onClick={() => modelFile.current?.click()}><span>↑</span><strong>{t.upload}</strong><small>{t.uploadHint}</small></button><input ref={modelFile} hidden type="file" accept=".ifc" onChange={(event) => void loadIfc(event.target.files?.[0], "current")} />
+        <div className="sample-title"><span>{t.samples}</span><span>{assessmentSamples.length}</span></div>
+        {assessmentSamples.map((sample) => <button className={`sample ${model.id === sample.id ? "current" : ""}`} key={sample.id} onClick={() => void loadSample(sample)}><span className="file-icon">IFC</span><span><strong>{sample.label[locale]}</strong><small>{sample.note[locale]}</small><small>{sample.schema} · {sample.licence}</small></span></button>)}
+        <div className="scope-card"><div className="eyebrow">{t.activePack}</div><strong>{activeRules.length} {locale === "zh" ? "条规则已启用" : "active rules"}</strong><p>{t.activeText}</p><button onClick={() => setView("rules")}>{t.inspect} →</button></div>
+      </aside>
+      <section className="review-main">
+        <div className="model-heading"><div><span className="breadcrumb">{t.project} / {model.schema} / {t.preReview}</span><h1>{model.name}</h1><p>{model.doors.length} {t.doors} · {model.spaces.length} {t.spaces} · {t.modelEvidence}</p>{model.provenance && <p className="provenance">{model.provenance} · {t.licence}: {model.licence}</p>}</div><button className="primary" onClick={runReview} disabled={busy || model.id === "empty"}>{busy ? t.running : t.run}</button></div>
+        <div className="canvas-card"><div className="canvas-toolbar"><span><b>{t.evidenceMap}</b><small>{t.viewerHint}</small></span><span className="legend"><i className="dot-fail" /> {t.fail} <i className="dot-review" /> {t.review} <i className="dot-pass" /> {t.pass}</span></div><IfcViewer source={modelSource} sourceKey={model.id} findings={findings} selectedGlobalId={selected?.elementId} onPick={pickFinding} locale={locale} /></div>
+        <div className="assurance-row"><div><span>01</span><strong>{locale === "zh" ? "确定性判定" : "Deterministic verdicts"}</strong><small>{locale === "zh" ? "Agent 不能改变规则引擎结果。" : "The Agent cannot alter rule-engine outcomes."}</small></div><div><span>02</span><strong>{locale === "zh" ? "明确不确定性" : "Explicit uncertainty"}</strong><small>{locale === "zh" ? "代理值或缺失证据将标为需复核。" : "Proxy or missing evidence becomes REVIEW."}</small></div><div><span>03</span><strong>{locale === "zh" ? "可追溯证据" : "Traceable evidence"}</strong><small>{locale === "zh" ? "每项结果关联 IFC GlobalId。" : "Every finding links to an IFC GlobalId."}</small></div></div>
+      </section>
+      <aside className="results-panel"><div className="results-head"><span><b>{t.findings}</b><small>{findings.length ? `${findings.length} ${t.checks}` : t.ready}</small></span></div><div className="metrics"><div><strong>{summary.FAIL}</strong><span>{t.fail}</span></div><div><strong>{summary.REVIEW}</strong><span>{t.review}</span></div><div><strong>{summary.PASS}</strong><span>{t.pass}</span></div><div><strong>{summary.NOT_APPLICABLE}</strong><span>{t.na}</span></div></div>
+        {!findings.length ? <div className="empty-results"><span>◎</span><h2>{model.id !== "empty" && model.doors.length === 0 ? t.noApplicable : t.evidenceReady}</h2><p>{t.evidenceReadyText}</p></div> : <><div className="finding-list">{findings.map((finding) => <button className={selected?.id === finding.id ? "selected-finding" : ""} key={finding.id} onClick={() => setSelectedId(finding.id)}><Status value={finding.status} locale={locale} /><span><strong>{finding.elementName}</strong><small>{finding.ruleTitle}</small></span><b>›</b></button>)}</div>{selected && <div className="evidence-drawer"><div className="drawer-title"><Status value={selected.status} locale={locale} /><span>{selected.elementName}<small>{selected.elementId}</small></span></div><p>{selected.message}</p><dl><div><dt>{t.observed}</dt><dd>{selected.observed}</dd></div><div><dt>{t.required}</dt><dd>{selected.required}</dd></div><div><dt>{t.evidence}</dt><dd>{selected.evidencePath}</dd></div><div><dt>{t.reliability}</dt><dd>{selected.reliability}</dd></div></dl><div className="agent-note"><span>✦</span><p><b>{t.next}</b>{selected.nextStep}</p></div></div>}</>}
+      </aside>
+    </section>}
 
-            <div className="canvas-card">
-              <div className="canvas-toolbar">
-                <span><b>Evidence map</b><small>Abstract spatial index · not reconstructed IFC geometry</small></span>
-                <span className="legend"><i className="dot-fail" /> Fail <i className="dot-review" /> Review <i className="dot-pass" /> Pass</span>
-              </div>
-              <div className="model-stage">
-                <div className="grid-plane" />
-                <div className="building-model" aria-label="Abstract building evidence map">
-                  <div className="slab slab-one" />
-                  <div className="slab slab-two" />
-                  <div className="wall wall-a" />
-                  <div className="wall wall-b" />
-                  <div className="wall wall-c" />
-                  {model.doors.slice(0, 8).map((door, index) => {
-                    const result = findings.find((finding) => finding.elementId === door.globalId && finding.ruleId === "EGRESS-WIDTH-001");
-                    return <button key={door.globalId} title={`${door.name}: ${result?.status ?? "Not reviewed"}`} className={`door door-${index + 1} ${result ? `door-${result.status.toLowerCase()}` : ""}`} onClick={() => result && setSelectedId(result.id)}><span>{index + 1}</span></button>;
-                  })}
-                </div>
-                <div className="view-label">EVIDENCE VIEW · L1</div>
-              </div>
-            </div>
+    {view === "compare" && <section className="page-view"><div className="page-intro"><span className="eyebrow">MODEL A / MODEL B</span><h1>{t.compareTitle}</h1><p>{t.compareLead}</p></div><div className="compare-pickers"><label>{t.baseline}<button className="file-choice" onClick={() => baselineFile.current?.click()}>{baseline.name}</button><input hidden ref={baselineFile} type="file" accept=".ifc" onChange={(event) => void loadIfc(event.target.files?.[0], "baseline")} /></label><span>→</span><label>{t.current}<button className="file-choice" onClick={() => modelFile.current?.click()}>{model.name}</button></label></div><div className="compare-summary"><div><strong>{comparison.changed}</strong><span>{t.changed}</span></div><div><strong>{comparison.resolved}</strong><span>{t.resolved}</span></div><div><strong>{comparison.regressed}</strong><span>{t.regressed}</span></div><div><strong>{comparison.unchanged}</strong><span>{t.unchanged}</span></div></div><div className="diff-table"><div className="diff-row diff-header"><span>{t.element}</span><span>{t.before}</span><span>{t.after}</span><span>{t.outcome}</span></div>{comparison.items.slice(0, 250).map((item) => <div className="diff-row" key={item.id}><span>{item.name}<small>{item.id}</small></span><span>{item.before}</span><span>{item.after}</span><span className={`change-${item.kind}`}>{item.label}</span></div>)}</div></section>}
 
-            <div className="assurance-row">
-              <div><span>01</span><strong>Deterministic verdicts</strong><small>The Agent cannot alter rule outcomes.</small></div>
-              <div><span>02</span><strong>Explicit uncertainty</strong><small>Proxy or missing evidence becomes REVIEW.</small></div>
-              <div><span>03</span><strong>Traceable evidence</strong><small>Every finding links to an IFC GlobalId.</small></div>
-            </div>
-          </section>
+    {view === "rules" && <section className="page-view"><div className="page-intro"><span className="eyebrow">{locale === "zh" ? "人工确认闭环" : "HUMAN-IN-THE-LOOP"}</span><h1>{t.ruleTitle}</h1><p>{t.ruleLead}</p></div><div className="rule-layout"><div className="rule-composer"><label>{t.proposed}</label><textarea value={ruleText} onChange={(event) => setRuleText(event.target.value)} /><button className="primary" onClick={() => inspectProposal()}>{t.analyse}</button><div className="prompt-chips"><button onClick={() => setRuleText(locale === "zh" ? "已确认的疏散门净宽不得小于 1000 毫米，仅适用于医疗空间" : "Confirmed exit doors serving clinical spaces must have at least 1,000 mm clear width")}>{locale === "zh" ? "增加适用范围" : "Add scope"}</button><button onClick={() => setRuleText(`${ruleText} · ${locale === "zh" ? "来源条文与例外尚待填写" : "source clause and exceptions to be confirmed"}`)}>{locale === "zh" ? "增加来源提示" : "Add source prompt"}</button></div></div><div className="rule-preview">{proposal ? <><h2>{proposal.rule.title[locale]}</h2><div className={`score ${proposal.feasibility.valid ? "score-good" : "score-bad"}`}>{t.feasibility}: {proposal.feasibility.score}/100</div>{proposal.feasibility.issues.map((issue) => <p className="issue" key={issue}>{locale === "zh" ? localiseRuleText(issue) : issue}</p>)}<h3>{t.conflict}</h3><p>{proposal.conflict.summary[locale]}</p><h3>{t.advice}</h3><ul>{[...proposal.feasibility.suggestions, ...proposal.conflict.suggestions[locale]].map((suggestion) => <li key={suggestion}>{locale === "zh" ? localiseRuleText(suggestion) : suggestion}</li>)}</ul><div className="decision-grid"><button onClick={() => decide("replace")}>{t.replace}</button><button onClick={() => decide("keep")}>{t.keep}</button><button onClick={() => decide("cancel")}>{t.cancel}</button></div></> : <div className="empty-preview"><span>✦</span><p>{locale === "zh" ? "Agent 将在这里显示规则结构、冲突、可行性与修改建议。" : "The Agent will show rule structure, conflicts, feasibility and customisation advice here."}</p></div>}</div></div><div className="rule-catalogue"><h2>{t.catalogue}</h2><div className="catalogue-grid">{rules.map((rule) => <article key={`${rule.id}-${rule.version}`}><span>{rule.status === "ACTIVE" ? t.active : t.draft} · v{rule.version}</span><h3>{rule.title[locale]}</h3><p>{rule.description[locale]}</p><b>{rule.id} · {locale === "zh" ? localiseScope(rule.scope) : rule.scope}</b></article>)}</div></div></section>}
 
-          <aside className="results-panel">
-            <div className="results-head">
-              <span><b>Review findings</b><small>{ran ? `${findings.length} checks completed` : "Ready to run"}</small></span>
-              <button aria-label="More result options">•••</button>
-            </div>
-            <div className="metrics">
-              <div><strong>{summary.fail}</strong><span>FAIL</span></div><div><strong>{summary.review}</strong><span>REVIEW</span></div><div><strong>{summary.pass}</strong><span>PASS</span></div><div><strong>{summary.na}</strong><span>N/A</span></div>
-            </div>
-            {!ran ? (
-              <div className="empty-results"><span>◎</span><h2>Evidence is ready</h2><p>Run the review to evaluate two controlled rules without asking an AI to guess.</p></div>
-            ) : (
-              <>
-                <div className="finding-list">
-                  {findings.map((finding) => (
-                    <button className={selected?.id === finding.id ? "selected-finding" : ""} key={finding.id} onClick={() => setSelectedId(finding.id)}>
-                      <StatusPill status={finding.status} />
-                      <span><strong>{finding.elementName}</strong><small>{finding.ruleTitle}</small></span><b>›</b>
-                    </button>
-                  ))}
-                </div>
-                {selected && <div className="evidence-drawer">
-                  <div className="drawer-title"><StatusPill status={selected.status} /><span>{selected.elementName}<small>{selected.elementId}</small></span></div>
-                  <p>{selected.message}</p>
-                  <dl><div><dt>Observed</dt><dd>{selected.observed}</dd></div><div><dt>Required</dt><dd>{selected.required}</dd></div><div><dt>Evidence</dt><dd>{selected.evidencePath}</dd></div><div><dt>Reliability</dt><dd>{selected.reliability}</dd></div></dl>
-                  <div className="agent-note"><span>✦</span><p><b>Agent next step</b>{selected.nextStep}</p></div>
-                </div>}
-              </>
-            )}
-          </aside>
-        </section>
-      )}
+    {view === "sources" && <section className="page-view wide-page"><div className="page-intro"><span className="eyebrow">{locale === "zh" ? "文档智能" : "DOCUMENT INTELLIGENCE"}</span><h1>{t.sourceTitle}</h1><p>{t.sourceLead}</p></div><button className="source-upload" onClick={() => ruleFile.current?.click()}><span>＋</span><strong>{docBusy ? (locale === "zh" ? "正在读取…" : "Reading…") : t.uploadRule}</strong><small>{t.formats}</small></button><input ref={ruleFile} hidden type="file" accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json,.yaml,.yml,.ids,.ifc,.dxf,.dwg" onChange={(event) => void loadRuleFile(event.target.files?.[0])} />
+      <div className="document-workspace"><section><h2>{t.original}</h2>{!document ? <div className="doc-empty">{t.noDoc}</div> : <><div className="doc-meta"><strong>{document.name}</strong><small>SHA-256 {document.hash.slice(0, 16)}… · {(document.size / 1024).toFixed(1)} KB</small></div>{document.previewUrl ? <iframe className="document-preview" src={document.previewUrl} title={document.name} /> : <div className="document-preview html-preview" dangerouslySetInnerHTML={{ __html: document.previewHtml ?? "" }} />}{document.warnings.map((warning) => <p className="doc-warning" key={warning}>{warning}</p>)}</>}</section><section><h2>{t.extractedRules}</h2>{document?.rules.length ? document.rules.map((rule) => <article className="extracted-rule" key={rule.id}><span>{Math.round(rule.extractionConfidence * 100)}% · {rule.sourceAnchor}</span><h3>{rule.title[locale]}</h3><p>{rule.description[locale]}</p><button onClick={() => { setRuleText(rule.description.en); setView("rules"); window.setTimeout(() => inspectProposal(rule.description.en), 0); }}>{t.importRule}</button></article>) : <div className="doc-empty">{locale === "zh" ? "尚未找到可执行的数值规则。您仍可查看原文并手动建立规则。" : "No executable numerical rule was found. You can still inspect the source and draft one manually."}</div>}</section></div>
+      <div className="official-sources"><h2>{t.official}</h2><p>{t.officialNote}</p><div>{officialRuleSources.map((source) => <article key={source.id}><span>{locale === "zh" ? "香港特别行政区 · 官方链接" : "HKSAR · OFFICIAL LINK"}</span><h3>{source.title[locale]}</h3><p>{source.note[locale]}</p><a href={source.url} target="_blank" rel="noreferrer">{t.openSource} ↗</a></article>)}</div></div>
+    </section>}
 
-      {view === "compare" && (
-        <section className="page-view">
-          <div className="page-intro"><span className="eyebrow">MODEL VERSION CONTROL</span><h1>Show what changed, not merely what failed.</h1><p>Compare stable IFC GlobalIds across submissions and surface resolved, regressed and unchanged evidence.</p></div>
-          <div className="compare-pickers">
-            <label>BASELINE<select value={baseline.id} onChange={(event) => setBaseline(allModels.find((item) => item.id === event.target.value) ?? demoModels.baseline)}>{allModels.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
-            <span>→</span>
-            <label>CURRENT<select value={model.id} onChange={(event) => setModel(allModels.find((item) => item.id === event.target.value) ?? model)}>{allModels.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
-          </div>
-          <div className="compare-summary"><div><strong>{comparison.resolved}</strong><span>Resolved</span></div><div><strong>{comparison.regressed}</strong><span>Regressed</span></div><div><strong>{comparison.changed}</strong><span>Changed</span></div><div><strong>{comparison.unchanged}</strong><span>Unchanged</span></div></div>
-          <div className="diff-table"><div className="diff-row diff-header"><span>Element</span><span>Baseline</span><span>Current</span><span>Change</span></div>{comparison.items.map((item) => <div className="diff-row" key={item.id}><span><b>{item.name}</b><small>{item.id}</small></span><span>{item.before}</span><span>{item.after}</span><span className={`change-${item.kind}`}>{item.label}</span></div>)}</div>
-          <div className="benchmark-section">
-            <div className="page-intro"><span className="eyebrow">INDEPENDENT SUBMISSION BENCHMARK</span><h2>One evidence policy, three candidate IFC files.</h2><p>These are raw parser outcomes, not the candidates’ own claimed results. A high REVIEW count exposes missing or proxy evidence; it is not automatically a poor compliance score.</p></div>
-            <div className="benchmark-table">
-              <div className="benchmark-row benchmark-header"><span>Submission sample</span><span>Doors</span><span>Fail</span><span>Review</span><span>Pass</span><span>N/A</span><span>Interpretation</span></div>
-              {benchmarkRows.map((row) => <button className="benchmark-row" key={row.model.id} onClick={() => { loadCandidate(row.model); setView("review"); }}><span><b>{row.model.name}</b><small>{row.model.provenance}</small></span><span>{row.model.doors.length}</span><span className="metric-fail">{row.fail}</span><span className="metric-review">{row.review}</span><span className="metric-pass">{row.pass}</span><span>{row.na}</span><span>{row.fail ? "Explicit evidence supports a failure" : row.review ? "Human evidence confirmation required" : "No applicable door findings"}</span></button>)}
-            </div>
-          </div>
-        </section>
-      )}
+    {view === "agents" && <section className="page-view"><div className="page-intro"><span className="eyebrow">{locale === "zh" ? "计划 / 执行 / 验证" : "PLAN / ACT / VERIFY"}</span><h1>{t.agentTitle}</h1><p>{t.agentLead}</p></div><div className="agent-grid"><section className="memory-card"><h2>{t.memory}</h2><p>{t.memoryText}</p><dl><div><dt>{locale === "zh" ? "项目" : "Project"}</dt><dd>{memory.projectId}</dd></div><div><dt>{locale === "zh" ? "规则决策" : "Rule decisions"}</dt><dd>{memory.decisions.length}</dd></div><div><dt>{locale === "zh" ? "本地保存规则" : "Remembered rules"}</dt><dd>{memory.rules.length}</dd></div></dl><button onClick={() => { clearMemory(); setMemory(emptyMemory()); setRules(builtinRules); flash(locale === "zh" ? "项目记忆已清除" : "Project memory cleared"); }}>{t.clear}</button></section><section className="provider-card"><h2>{t.providers}</h2>{providers.map((item) => <label key={item.id} className={provider === item.id ? "provider-selected" : ""}><input type="radio" name="provider" checked={provider === item.id} onChange={() => setProvider(item.id)} /><span><strong>{item.name}</strong><small>{item.mode === "ready" ? (locale === "zh" ? "可用" : "Ready") : (locale === "zh" ? "需要运营者配置" : "Operator configuration required")}</small><p>{item.privacy[locale]}</p></span></label>)}</section></div><div className="trace-panel"><h2>{t.trace}</h2>{events.length ? events.map((event) => <article key={event.id}><time>{new Date(event.at).toLocaleTimeString(locale === "zh" ? "zh-HK" : "en-GB")}</time><span><b>{event.actor}</b><strong>{event.kind}</strong><p>{event.summary}</p>{event.evidence && <small>{event.evidence}</small>}</span></article>) : <div className="doc-empty">{t.noTrace}</div>}</div></section>}
 
-      {view === "rules" && (
-        <section className="page-view rule-page">
-          <div className="page-intro"><span className="eyebrow">CONTROLLED RULE AUTHORING</span><h1>Use natural language. Confirm the machine-readable rule.</h1><p>The Agent may interpret a request, but it cannot activate a rule until a reviewer confirms its target, evidence field, operator, threshold and unit.</p></div>
-          <div className="rule-layout">
-            <div className="rule-composer">
-              <label>Describe a project rule</label>
-              <textarea value={ruleText} onChange={(event) => setRuleText(event.target.value)} />
-              <button className="primary" onClick={() => setDraftRule(interpretRule(ruleText))}>Interpret rule</button>
-              <div className="supported"><b>Supported in this prototype</b><span>confirmed exit doors · clear width · below/at least · mm or m</span></div>
-            </div>
-            <div className="rule-preview">
-              <div className="eyebrow">HUMAN CONFIRMATION GATE</div>
-              {draftRule ? <><h2>{draftRule.title}</h2><dl><div><dt>Target</dt><dd>{draftRule.target}</dd></div><div><dt>Evidence field</dt><dd>{draftRule.field}</dd></div><div><dt>Condition</dt><dd>{draftRule.operator} {draftRule.threshold} {draftRule.unit}</dd></div><div><dt>Missing evidence</dt><dd>REVIEW — never inferred</dd></div><div><dt>Authority</dt><dd>Project rule · reviewer supplied</dd></div></dl><div className="confirm-warning">Activating this rule records your confirmation. It does not turn a project preference into legislation.</div><button className="confirm" onClick={() => { setConfirmedRules([...confirmedRules, draftRule]); setDraftRule(null); setToast("Project rule confirmed and activated"); window.setTimeout(() => setToast(""), 2500); }}>Confirm and activate</button></> : <div className="empty-preview"><span>⌁</span><p>Your structured rule will appear here for confirmation.</p></div>}
-            </div>
-          </div>
-          <div className="rule-catalogue"><h2>Active rule catalogue</h2><div className="catalogue-grid"><article><span>BUILT-IN · v1.0</span><h3>Exit door clear-width evidence</h3><p>Confirmed exit doors are checked against an explicit 900 mm demonstration threshold.</p><b>Deterministic</b></article><article><span>BUILT-IN · v1.0</span><h3>Door information completeness</h3><p>Name, exit status, width provenance and fire-rating evidence are checked for review readiness.</p><b>Deterministic</b></article>{confirmedRules.map((rule, index) => <article key={`${rule.title}-${index}`}><span>PROJECT RULE · CONFIRMED</span><h3>{rule.title}</h3><p>{rule.target}; {rule.field} {rule.operator} {rule.threshold} {rule.unit}.</p><b>Reviewer approved</b></article>)}</div></div>
-        </section>
-      )}
-
-      {view === "report" && (
-        <section className="page-view report-page">
-          <div className="page-intro report-intro"><div><span className="eyebrow">FAITHFUL REPORTING</span><h1>{language === "en" ? "A report that cannot rewrite the evidence." : "一份不能改写证据的报告。"}</h1><p>{language === "en" ? "Generated from structured findings only. Verdicts, measurements and rule references remain locked." : "仅从结构化检查结果生成；判定、测量值与规则引用均保持锁定。"}</p></div><button className="primary" onClick={downloadReport} disabled={!ran}>Download Markdown</button></div>
-          {!ran ? <div className="report-empty"><span>≡</span><h2>Run a review first</h2><p>The report is built from completed, traceable findings rather than model-free prose.</p><button onClick={() => setView("review")}>Return to review</button></div> : <div className="report-sheet"><div className="report-meta"><span>PRE-REVIEW REPORT</span><span>{new Date().toISOString().slice(0, 10)}</span></div><h2>{model.name}</h2><p className="lead">{language === "en" ? `${findings.length} evidence checks were completed. ${summary.fail} failed and ${summary.review} require professional review.` : `已完成 ${findings.length} 项证据检查，其中 ${summary.fail} 项不通过，${summary.review} 项需要专业复核。`}</p><div className="report-kpis"><div><strong>{summary.fail}</strong><span>FAIL</span></div><div><strong>{summary.review}</strong><span>REVIEW</span></div><div><strong>{summary.pass}</strong><span>PASS</span></div></div><h3>{language === "en" ? "Priority findings" : "优先问题"}</h3>{findings.filter((finding) => finding.status !== "PASS" && finding.status !== "NOT_APPLICABLE").map((finding) => <article key={finding.id}><StatusPill status={finding.status} /><div><h4>{finding.elementName} · {finding.ruleTitle}</h4><p>{finding.message}</p><small>{finding.elementId} · {finding.evidencePath} · {finding.reliability}</small></div></article>)}<footer><span>✓ Numeric claims checked against structured findings</span><p>This prototype supports professional pre-review. It does not certify statutory compliance.</p></footer></div>}
-        </section>
-      )}
-      {toast && <div className="toast">✓ {toast}</div>}
-    </main>
-  );
+    {view === "report" && <section className="page-view"><div className="page-intro report-intro"><div><span className="eyebrow">NUMERICALLY GUARDED</span><h1>{t.reportTitle}</h1><p>{t.reportLead}</p></div>{findings.length > 0 && <button className="primary" disabled={!verification.valid} onClick={downloadReport}>{t.download}</button>}</div>{!findings.length ? <div className="report-empty"><span>□</span><h2>{t.noReport}</h2><button onClick={() => setView("review")}>{t.nav.review} →</button></div> : <><div className={`verification-banner ${verification.valid ? "verified" : "verification-failed"}`}><strong>{t.verification}: {verification.valid ? t.valid : t.blocked}</strong>{verification.issues.map((issue) => <span key={issue}>{issue}</span>)}</div><div className="report-sheet"><div className="report-meta"><span>EVIDENCE AGENT</span><span>{model.schema} · {model.units}</span></div><h2>{locale === "zh" ? "BIM 合规证据预审" : "BIM Compliance Evidence Pre-review"}</h2><p className="lead">{locale === "zh" ? `完成 ${findings.length} 项检查；${summary.FAIL} 项不通过，${summary.REVIEW} 项需要专业复核。` : `${findings.length} checks completed; ${summary.FAIL} failed and ${summary.REVIEW} require professional review.`}</p><div className="report-kpis"><div><strong>{summary.FAIL}</strong><span>{t.fail}</span></div><div><strong>{summary.REVIEW}</strong><span>{t.review}</span></div><div><strong>{summary.PASS}</strong><span>{t.pass}</span></div></div>{findings.filter((item) => item.status === "FAIL" || item.status === "REVIEW").slice(0, 16).map((finding) => <article key={finding.id}><Status value={finding.status} locale={locale} /><div><h4>{finding.elementName} — {finding.ruleTitle}</h4><p>{finding.message}</p><small>{finding.elementId} · {finding.evidencePath}</small></div></article>)}<footer><span>{t.disclaimer}</span></footer></div><div className="prompt-card"><h2>{t.prompt}</h2><textarea readOnly value={prompt} /><button onClick={() => void navigator.clipboard.writeText(prompt).then(() => flash(locale === "zh" ? "提示词已复制" : "Prompt copied"))}>{t.copyPrompt}</button></div></>}</section>}
+    {toast && <div className="toast" role="status">{toast}</div>}
+  </main>;
 }

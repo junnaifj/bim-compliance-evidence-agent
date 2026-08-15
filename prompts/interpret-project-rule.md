@@ -1,21 +1,14 @@
-# Controlled project-rule interpretation
+# Rule interpretation contract
 
-Convert a reviewer request into a proposed machine-readable project rule. Do not activate it.
+Return only a candidate structure containing target entity, evidence field, operator, threshold, unit, scope, jurisdiction, source anchor, exceptions, missing-evidence policy and confidence.
 
-Return only:
+Check:
 
-```json
-{
-  "title": "string",
-  "target": "explicit IFC entity and applicability condition",
-  "field": "allowlisted evidence field",
-  "operator": ">= | <= | = | exists",
-  "threshold": "number or null",
-  "unit": "allowlisted unit or null",
-  "missing_evidence_result": "REVIEW",
-  "authority": "PROJECT_RULE",
-  "confirmation_required": true
-}
-```
+1. whether the target and measurable property exist;
+2. whether the unit and quantity are plausible;
+3. whether applicability and exceptions are explicit;
+4. whether the proposal duplicates, tightens, relaxes or overlaps an active rule;
+5. whether the uploaded model can supply the required evidence.
 
-Reject requests that require guessing design intent, inventing missing measurements, changing a built-in rule or treating a project preference as legislation.
+Never set the status to `ACTIVE`. Never infer exit status, occupancy, fire rating or statutory authority from a name.
+
