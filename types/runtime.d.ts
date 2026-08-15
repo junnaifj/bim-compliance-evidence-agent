@@ -1,4 +1,5 @@
 declare module "pdfjs-dist/build/pdf.mjs" {
+  export const GlobalWorkerOptions: { workerSrc: string };
   export function getDocument(source: unknown): { promise: Promise<{ numPages: number; getPage(page: number): Promise<{ getTextContent(): Promise<{ items: { str?: string }[] }> }> }> };
 }
 

@@ -16,5 +16,14 @@
     "sha256": "121b7ea3889a86f8c1efcb00718dee7b22c9faeb0c25e3179d9ecd5d238924fe",
     "redistribution": false,
     "git_ignored": true
+  },
+  "official_local_quick_fixture": {
+    "filename": "hk-official/PNAP_ADV34_BIM.pdf",
+    "source": "https://www.bd.gov.hk/doc/en/resources/codes-and-references/practice-notes-and-circular-letters/pnap/ADV/ADV034.pdf",
+    "publisher": "Buildings Department, HKSAR Government",
+    "sha256": "aa45cced0da8469d541e6a18d5c6c8f9e908776a9951acc5633742d6c9d110bc",
+    "pages": 4,
+    "redistribution": false,
+    "git_ignored": true
   }
 }

@@ -82,7 +82,10 @@ export function extractRulesFromText(text: string, sourceDocumentId: string): Ru
 export async function readRuleDocument(file: File): Promise<RuleDocument> {
   if (file.size > 40 * 1024 * 1024) throw new Error("The rule-source file exceeds the 40 MB assessment limit.");
   const extension = file.name.split(".").pop()?.toLowerCase() ?? ""; const buffer = await file.arrayBuffer();
-  const id = `doc-${(await digest(buffer)).slice(0, 12)}`; let extractedText = ""; let previewHtml = ""; const warnings: string[] = [];
+  // pdf.js may transfer/detach the supplied ArrayBuffer. Capture the evidence hash
+  // before any parser receives it so the audit record can never degrade to the
+  // SHA-256 of an empty buffer after extraction.
+  const hash = await digest(buffer); const id = `doc-${hash.slice(0, 12)}`; let extractedText = ""; let previewHtml = ""; const warnings: string[] = [];
   const textTypes = ["txt", "md", "csv", "json", "yaml", "yml", "ids", "dxf", "ifc"];
   if (textTypes.includes(extension)) {
     extractedText = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
@@ -101,7 +104,7 @@ export async function readRuleDocument(file: File): Promise<RuleDocument> {
     throw new Error("Legacy XLS is not parsed in-browser. Save it as XLSX or CSV to retain a safer, bounded import path.");
   } else if (extension === "pdf") {
     try {
-      const pdfjs = await import("pdfjs-dist/build/pdf.mjs"); const pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer), disableWorker: true }).promise;
+      const pdfjs = await import("pdfjs-dist/build/pdf.mjs"); pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs"; const pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
       const pages: string[] = []; const extractionLimit = Math.min(pdf.numPages, 25);
       for (let pageNumber = 1; pageNumber <= extractionLimit; pageNumber += 1) {
         const content = await (await pdf.getPage(pageNumber)).getTextContent();
@@ -117,5 +120,5 @@ export async function readRuleDocument(file: File): Promise<RuleDocument> {
   } else throw new Error("Unsupported rule-source format. Use PDF, DOCX, XLSX, CSV, text, JSON, YAML, IDS, IFC or DXF.");
   if (!extractedText.trim()) warnings.push("No machine-readable text was found. OCR or manual transcription may be required.");
   const previewUrl = extension === "pdf" ? URL.createObjectURL(file) : undefined;
-  return { id, name: file.name, mime: file.type || `application/${extension}`, size: file.size, hash: await digest(buffer), previewUrl, previewHtml, extractedText, source: "uploaded", licence: "User-supplied; not redistributed", rules: extractRulesFromText(extractedText, id), warnings };
+  return { id, name: file.name, mime: file.type || `application/${extension}`, size: file.size, hash, previewUrl, previewHtml, extractedText, source: "uploaded", licence: "User-supplied; not redistributed", rules: extractRulesFromText(extractedText, id), warnings };
 }
