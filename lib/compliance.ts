@@ -251,6 +251,11 @@ export function buildReport(model: BuildingModel, findings: Finding[], locale: L
 export function verifyReport(report: string, findings: Finding[]): { valid: boolean; issues: string[] } {
   const issues: string[] = []; const requiredIds = findings.map((item) => item.elementId);
   for (const id of requiredIds) if (!report.includes(id)) issues.push(`Missing GlobalId: ${id}`);
+  const findingSections = report.split(/(?=^### \[)/gm);
+  for (const finding of findings) {
+    const section = findingSections.find((candidate) => candidate.includes(finding.elementId) && candidate.includes(finding.ruleTitle));
+    if (section && !section.startsWith(`### [${finding.status}]`)) issues.push(`Verdict mismatch for ${finding.elementId}: expected ${finding.status}`);
+  }
   const allowedNumbers = new Set<number>([findings.length, ...findings.flatMap((item) => {
     const values = [item.observedValue, item.thresholdValue].filter((value): value is number => value !== undefined);
     if (item.observedValue !== undefined && item.thresholdValue !== undefined) values.push(Math.abs(item.thresholdValue - item.observedValue));

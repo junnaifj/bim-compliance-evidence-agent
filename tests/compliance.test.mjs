@@ -58,6 +58,11 @@ test("the identifier guard catches an invented GlobalId", () => {
   const result = verifyReport(report, findings); assert.equal(result.valid, false); assert.match(result.issues.join(" "), /Missing GlobalId|Unknown identifier/);
 });
 
+test("the verdict guard catches a REVIEW-to-PASS hallucination", () => {
+  const model = explicitDoorModel(850); model.doors[0].widthSource = "overall_width_proxy"; const findings = analyseModel(model); const report = buildReport(model, findings, "en").replace("### [REVIEW]", "### [PASS]");
+  const result = verifyReport(report, findings); assert.equal(result.valid, false); assert.match(result.issues.join(" "), /Verdict mismatch/);
+});
+
 test("real Duplex and Clinic samples preserve expected entity counts", async () => {
   const duplex = parseIfc(await readFile(new URL("../public/samples/duplex-xeokit.ifc", import.meta.url), "utf8"), "duplex-xeokit.ifc", "sample");
   const clinic = parseIfc(await readFile(new URL("../public/samples/medical-dental-clinic.ifc", import.meta.url), "utf8"), "medical-dental-clinic.ifc", "sample");
@@ -70,4 +75,3 @@ test("official IFC4 negative control does not invent targets or findings", async
 });
 
 test("malformed and disguised input is rejected", () => assert.throws(() => parseIfc("<script>alert(1)</script>", "model.ifc"), /not a readable IFC/i));
-

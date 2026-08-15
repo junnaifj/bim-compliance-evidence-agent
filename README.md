@@ -10,11 +10,11 @@ The complete demonstration works without an API key:
 
 1. Load the small, licensed **Duplex residence** sample or upload an IFC2x3/IFC4 file.
 2. Orbit, pan and zoom the real IFC geometry; use X-ray and section controls.
-3. Run two deterministic checks and select a finding to focus its IFC element by GlobalId.
+3. Run two deterministic checks. Hover an element to isolate it temporarily; click an element to keep it highlighted and filter the findings panel by GlobalId. Click empty space or press Escape to return to all findings.
 4. Propose a natural-language rule. The Agent checks feasibility and the active catalogue before asking whether to replace the existing rule, keep both with distinct scope, or cancel.
 5. Upload a PDF, DOCX, XLSX, CSV, IDS, IFC, DXF or text rule source. Preview it and send extracted numerical clauses to conflict review.
 6. Inspect the plan–act–verify trace, project memory and provider registry.
-7. Generate an English or Chinese report. Export is enabled only after every identifier and numerical claim passes verification.
+7. Tell the in-app Report Agent—in ordinary English or Chinese—who will read the report and what it should emphasise. Review its editable brief and generate without copying a prompt. Export is enabled only after identifiers, verdicts and numerical claims pass verification.
 
 ## Deterministic rules
 
@@ -49,7 +49,7 @@ Extracted clauses remain `DRAFT`. A source page, sheet or text segment is retain
 - Rule Agent — conflict, plausibility, scope and unit checks.
 - Deterministic Rule Engine — verdict authority.
 - Evidence Verifier — identifier and numerical guardrail.
-- Report Agent — faithful English, Chinese or prompt-based narrative.
+- Report Agent — converts natural language into an editable, human-confirmed brief and produces an evidence-bound English, Chinese or bilingual narrative. A copyable external-LLM package is available only as an advanced option.
 
 Project memory is device-local, inspectable and erasable. It stores approved rules and decisions, never API keys, and cannot bypass approval. Optional provider entries are deliberately separated from rule truth; the local path always remains available.
 
@@ -79,6 +79,8 @@ lib/compliance.ts            IFC evidence, rules, conflicts, reports and guardra
 lib/document-intelligence.ts Rule-source parsing and official-source registry
 lib/memory.ts                Device-local project and audit memory
 lib/agent.ts                 Provider registry and transparent orchestration trace
+lib/report-agent.ts          Natural-language report brief, routing and safeguards
+lib/viewer-interaction.ts    Hover/selection state and GlobalId finding filters
 public/samples/               Licensed real IFC assessment models
 prompts/                      Public Agent contracts
 tests/                        Boundary, sample, security, licence and hallucination tests
@@ -88,4 +90,3 @@ docs/                         Architecture, SSD and assessment evidence
 ## Licence
 
 Application code is MIT licensed. External IFC models and web-ifc retain their own licences and attribution; see `licences/` and the sample manifest.
-
