@@ -1,0 +1,20 @@
+{
+  "ifc": {
+    "filename": "ifc/IfcOpenHouse.ifc",
+    "source": "https://github.com/cvillagrasa/IfcOpenHouse/blob/master/ifc/IfcOpenHouse.ifc",
+    "licence": "Apache-2.0",
+    "sha256": "6e3bb9e0074b1c098c0074b4f8ea6036a5198b93deeb036df7c99ea73f1f0932",
+    "schema": "IFC4",
+    "storeys": 1,
+    "doors": 1,
+    "spaces": 0
+  },
+  "official_local_reference": {
+    "filename": "hk-official/BIMSPS_2023_en.pdf",
+    "source": "https://www.bd.gov.hk/doc/en/resources/codes-and-references/code-and-design-manuals/BIMSPS_e.pdf",
+    "publisher": "Buildings Department, HKSAR Government",
+    "sha256": "121b7ea3889a86f8c1efcb00718dee7b22c9faeb0c25e3179d9ecd5d238924fe",
+    "redistribution": false,
+    "git_ignored": true
+  }
+}

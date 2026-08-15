@@ -10,7 +10,7 @@ The complete demonstration works without an API key:
 
 1. Load the small, licensed **Duplex residence** sample or upload an IFC2x3/IFC4 file.
 2. Orbit, pan and zoom the real IFC geometry; use X-ray and section controls.
-3. Run two deterministic checks. Hover an element to isolate it temporarily; click an element to keep it highlighted and filter the findings panel by GlobalId. Click empty space or press Escape to return to all findings.
+3. Run two deterministic checks. Move the pointer over the model to keep every reviewed element status-coloured while unreviewed shells become transparent grey. The picker searches the complete ray and prefers reviewed internal elements. Click one element to isolate it and filter findings by GlobalId; click empty space or press Escape to clear.
 4. Propose a natural-language rule. The Agent checks feasibility and the active catalogue before asking whether to replace the existing rule, keep both with distinct scope, or cancel.
 5. Upload a PDF, DOCX, XLSX, CSV, IDS, IFC, DXF or text rule source. Preview it and send extracted numerical clauses to conflict review.
 6. Inspect the plan–act–verify trace, project memory and provider registry.
@@ -34,6 +34,10 @@ The product contains no candidate benchmark section. Three open-source models co
 - buildingSMART PCERT Architecture — CC BY 4.0 IFC4 negative control.
 
 See [`public/samples/manifest.json`](public/samples/manifest.json) for exact source URLs, licences, hashes and expected counts. CI verifies every redistributed byte.
+
+## Manual upload fixtures
+
+[`manual-test-files/`](manual-test-files/) contains a concise Apache-2.0 `IfcOpenHouse.ifc` fixture and attribution for manual model-upload testing. A Buildings Department BIM statutory-submission PDF can also be downloaded into the Git-ignored `manual-test-files/hk-official/` folder for private preview testing. Its official URL, local hash and non-redistribution treatment are recorded in the manual-fixture manifest.
 
 ## Rule sources and copyright
 

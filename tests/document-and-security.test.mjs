@@ -14,7 +14,7 @@ test("prompt injection text does not create an executable rule", () => {
 });
 
 test("official Hong Kong files are link-only and not marked for redistribution", () => {
-  assert.ok(officialRuleSources.length >= 3); assert.ok(officialRuleSources.every((source) => source.url.startsWith("https://") && source.redistribution === false));
+  assert.ok(officialRuleSources.length >= 4); assert.ok(officialRuleSources.every((source) => source.url.startsWith("https://") && source.redistribution === false)); assert.ok(officialRuleSources.some((source) => source.id === "hkbd-bimsps-2023" && source.url.endsWith("BIMSPS_e.pdf")));
 });
 
 test("Chinese mode has complete working labels and the removed benchmark is absent", async () => {
@@ -22,4 +22,3 @@ test("Chinese mode has complete working labels and the removed benchmark is abse
   for (const label of ["上传 IFC 模型", "证据地图", "规则来源库", "透明 Agent 工作空间", "已验证审查报告"]) assert.match(source, new RegExp(label));
   assert.doesNotMatch(source, /Candidate benchmarks|candidateModels|loadCandidate/);
 });
-

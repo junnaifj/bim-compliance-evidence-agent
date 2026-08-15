@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { filterFindingsForSelection, initialViewerInteraction, reduceViewerInteraction } from "../lib/viewer-interaction.ts";
+import { choosePickCandidate, describeElementVisual, filterFindingsForSelection, initialViewerInteraction, reduceViewerInteraction } from "../lib/viewer-interaction.ts";
 import { defaultReportBrief, findingsForBrief, interpretReportRequest } from "../lib/report-agent.ts";
 
 const findings = [
@@ -14,7 +14,26 @@ test("viewer interaction gives selection priority and clears deterministically",
   const selected = reduceViewerInteraction(hovered, { type: "SELECT", globalId: "G-1" });
   assert.equal(selected.hoveredGlobalId, undefined); assert.equal(selected.selectedGlobalId, "G-1");
   assert.deepEqual(reduceViewerInteraction(selected, { type: "HOVER", globalId: "G-2" }), selected);
-  assert.deepEqual(reduceViewerInteraction(selected, { type: "CLEAR" }), initialViewerInteraction);
+  assert.deepEqual(reduceViewerInteraction(selected, { type: "CLEAR" }), { ...initialViewerInteraction, pointerInside: true });
+});
+
+test("internal reviewed elements take pick priority through an unreviewed shell", () => {
+  const hits = [{ globalId: "WALL", expressId: 1, distance: 1 }, { globalId: "DOOR", expressId: 2, distance: 2 }];
+  assert.equal(choosePickCandidate(hits, new Set(["DOOR"]))?.globalId, "DOOR");
+  assert.equal(choosePickCandidate(hits, new Set())?.globalId, "WALL");
+});
+
+test("discovery keeps every reviewed element coloured and dims unreviewed geometry", () => {
+  const interaction = reduceViewerInteraction(initialViewerInteraction, { type: "HOVER", globalId: "DOOR-A" });
+  assert.deepEqual(describeElementVisual({ globalId: "DOOR-A", reviewed: true, interaction }), { colourRole: "status", opacityRole: "original", emphasised: true });
+  assert.deepEqual(describeElementVisual({ globalId: "DOOR-B", reviewed: true, interaction }), { colourRole: "status", opacityRole: "original", emphasised: false });
+  assert.deepEqual(describeElementVisual({ globalId: "WALL", reviewed: false, interaction }), { colourRole: "grey", opacityRole: "dim", emphasised: false });
+});
+
+test("selection greys every other element including other reviewed elements", () => {
+  const interaction = reduceViewerInteraction({ ...initialViewerInteraction, pointerInside: true }, { type: "SELECT", globalId: "DOOR-A" });
+  assert.equal(describeElementVisual({ globalId: "DOOR-A", reviewed: true, interaction }).colourRole, "status");
+  assert.deepEqual(describeElementVisual({ globalId: "DOOR-B", reviewed: true, interaction }), { colourRole: "grey", opacityRole: "dim", emphasised: false });
 });
 
 test("selected GlobalId filters every finding for that element and no others", () => {

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Finding } from "../lib/compliance";
-import type { ViewerElement } from "../lib/viewer-interaction";
+import { choosePickCandidate, describeElementVisual, type ViewerElement, type ViewerInteraction } from "../lib/viewer-interaction";
 
 type Props = {
   source: string | ArrayBuffer | null;
@@ -13,7 +13,6 @@ type Props = {
   locale: "en" | "zh";
 };
 
-type InteractionVisual = { hoveredGlobalId?: string; selectedGlobalId?: string; xray: boolean };
 type ViewerControls = {
   fit(): void;
   focus(globalId: string): void;
@@ -29,7 +28,7 @@ const statusColour = (status?: Finding["status"]) => status === "FAIL" ? 0xd7483
 export default function IfcViewer({ source, sourceKey, findings, selectedGlobalId, onSelect, locale }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null); const controlsRef = useRef<ViewerControls | null>(null); const onSelectRef = useRef(onSelect); const findingsRef = useRef(findings);
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle"); const [message, setMessage] = useState(""); const [xray, setXray] = useState(false); const [section, setSection] = useState(false);
-  const [hovered, setHovered] = useState<ViewerElement | null>(null); const [internalSelectedId, setInternalSelectedId] = useState<string | undefined>(selectedGlobalId); const [tooltip, setTooltip] = useState({ x: 0, y: 0 });
+  const [hovered, setHovered] = useState<ViewerElement | null>(null); const [pointerInside, setPointerInside] = useState(false); const [internalSelectedId, setInternalSelectedId] = useState<string | undefined>(selectedGlobalId); const [tooltip, setTooltip] = useState({ x: 0, y: 0 });
   onSelectRef.current = onSelect; findingsRef.current = findings;
 
   useEffect(() => {
@@ -68,25 +67,26 @@ export default function IfcViewer({ source, sourceKey, findings, selectedGlobalI
         api.CloseModel(modelID);
         const bounds = new THREE.Box3().setFromObject(root); const centre = bounds.getCenter(new THREE.Vector3()); const size = bounds.getSize(new THREE.Vector3()); const radius = Math.max(size.x, size.y, size.z, 1);
         const fit = (box = bounds) => { const c = box.getCenter(new THREE.Vector3()); const s = box.getSize(new THREE.Vector3()); const r = Math.max(s.x, s.y, s.z, 1); camera.position.set(c.x + r * 1.5, c.y + r, c.z + r * 1.5); camera.near = Math.max(r / 1000, 0.01); camera.far = r * 100; camera.updateProjectionMatrix(); orbit.target.copy(c); orbit.update(); };
-        fit(); const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2(); const visual: InteractionVisual = { xray: false }; let currentFindings = findingsRef.current; let pointerFrame = 0;
+        fit(); const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2(); const visual: ViewerInteraction = { xray: false, pointerInside: false }; let currentFindings = findingsRef.current; let pointerFrame = 0;
         const priority: Record<string, number> = { FAIL: 4, REVIEW: 3, PASS: 2, NOT_APPLICABLE: 1 };
         const bestFinding = () => { const best = new Map<string, Finding>(); currentFindings.forEach((finding) => { if (!best.has(finding.elementId) || priority[finding.status] > priority[best.get(finding.elementId)!.status]) best.set(finding.elementId, finding); }); return best; };
         const applyVisual = () => {
-          const statuses = bestFinding();
+          const statuses = bestFinding(); const effectiveInteraction = { ...visual, pointerInside: visual.pointerInside && statuses.size > 0 };
           for (const mesh of root.children as import("three").Mesh[]) {
-            const material = mesh.material as import("three").MeshStandardMaterial; const globalId = mesh.userData.globalId as string; const selected = visual.selectedGlobalId === globalId; const hoveredId = visual.selectedGlobalId ? undefined : visual.hoveredGlobalId; const hoveredMesh = hoveredId === globalId; const isolating = Boolean(visual.selectedGlobalId || hoveredId); const findingColour = statusColour(statuses.get(globalId)?.status);
-            material.color.copy(mesh.userData.originalColour); if (findingColour !== undefined) material.color.setHex(findingColour); material.emissive.setHex(0x000000); material.emissiveIntensity = 1;
-            if (isolating && !selected && !hoveredMesh) { material.color.setHex(visual.selectedGlobalId ? 0x9ca6a1 : 0xaeb8b3); material.opacity = visual.selectedGlobalId ? 0.22 : 0.18; }
-            else { material.opacity = visual.xray && !selected && !hoveredMesh ? 0.18 : mesh.userData.originalOpacity; if (selected || hoveredMesh) { material.emissive.setHex(selected ? 0x14382b : 0x1d5d45); material.emissiveIntensity = selected ? 0.65 : 0.45; } }
+            const material = mesh.material as import("three").MeshStandardMaterial; const globalId = mesh.userData.globalId as string; const finding = statuses.get(globalId); const descriptor = describeElementVisual({ globalId, reviewed: Boolean(finding), interaction: effectiveInteraction }); const findingColour = statusColour(finding?.status);
+            material.color.copy(mesh.userData.originalColour); if (descriptor.colourRole === "status" && findingColour !== undefined) material.color.setHex(findingColour); if (descriptor.colourRole === "grey") material.color.setHex(0x9da8a2); material.emissive.setHex(0x000000); material.emissiveIntensity = 1;
+            material.opacity = descriptor.opacityRole === "dim" ? 0.16 : descriptor.opacityRole === "xray" ? 0.18 : mesh.userData.originalOpacity;
+            if (descriptor.emphasised) { material.emissive.setHex(visual.selectedGlobalId ? 0x14382b : 0x1d5d45); material.emissiveIntensity = visual.selectedGlobalId ? 0.65 : 0.45; }
             material.transparent = material.opacity < 0.99; material.depthWrite = material.opacity >= 0.5; material.needsUpdate = true;
           }
         };
-        const hitAt = (event: MouseEvent): ViewerElement | null => { const rect = canvas.getBoundingClientRect(); pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1); raycaster.setFromCamera(pointer, camera); const hit = raycaster.intersectObjects(root.children, false)[0]; const expressId = hit?.object.userData.expressId as number | undefined; return expressId === undefined ? null : metadata.get(expressId) ?? null; };
-        const move = (event: MouseEvent) => { setTooltip({ x: event.offsetX + 14, y: event.offsetY + 14 }); if (pointerFrame || visual.selectedGlobalId) return; pointerFrame = requestAnimationFrame(() => { pointerFrame = 0; const item = hitAt(event); if (item?.globalId === visual.hoveredGlobalId) return; visual.hoveredGlobalId = item?.globalId; setHovered(item); applyVisual(); }); };
-        const leave = () => { if (visual.selectedGlobalId) return; visual.hoveredGlobalId = undefined; setHovered(null); applyVisual(); };
+        const hitAt = (event: MouseEvent): ViewerElement | null => { const rect = canvas.getBoundingClientRect(); pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1); raycaster.setFromCamera(pointer, camera); const hits = raycaster.intersectObjects(root.children, false).map((hit) => ({ globalId: hit.object.userData.globalId as string, expressId: hit.object.userData.expressId as number, distance: hit.distance })).filter((hit) => !hit.globalId.startsWith("express-")); const reviewed = new Set(currentFindings.map((finding) => finding.elementId)); const candidate = choosePickCandidate(hits, reviewed); return candidate ? metadata.get(candidate.expressId) ?? null : null; };
+        const enter = () => { visual.pointerInside = true; setPointerInside(true); applyVisual(); };
+        const move = (event: MouseEvent) => { setTooltip({ x: event.offsetX + 14, y: event.offsetY + 14 }); visual.pointerInside = true; setPointerInside(true); if (pointerFrame || visual.selectedGlobalId) return; pointerFrame = requestAnimationFrame(() => { pointerFrame = 0; const item = hitAt(event); if (item?.globalId === visual.hoveredGlobalId) return; visual.hoveredGlobalId = item?.globalId; setHovered(item); applyVisual(); }); };
+        const leave = () => { visual.pointerInside = false; setPointerInside(false); visual.hoveredGlobalId = undefined; setHovered(null); applyVisual(); };
         const select = (event: MouseEvent) => { const item = hitAt(event); visual.selectedGlobalId = item?.globalId; visual.hoveredGlobalId = undefined; setHovered(null); setInternalSelectedId(item?.globalId); applyVisual(); onSelectRef.current(item); };
         const keydown = (event: KeyboardEvent) => { if (event.key !== "Escape") return; visual.selectedGlobalId = undefined; visual.hoveredGlobalId = undefined; setInternalSelectedId(undefined); setHovered(null); applyVisual(); onSelectRef.current(null); };
-        canvas.addEventListener("mousemove", move); canvas.addEventListener("mouseleave", leave); canvas.addEventListener("click", select); window.addEventListener("keydown", keydown);
+        canvas.addEventListener("mouseenter", enter); canvas.addEventListener("mousemove", move); canvas.addEventListener("mouseleave", leave); canvas.addEventListener("click", select); window.addEventListener("keydown", keydown);
         let sectionEnabled = false; const plane = new THREE.Plane(new THREE.Vector3(0, -1, 0), centre.y + size.y * 0.25);
         controlsRef.current = {
           fit: () => fit(),
@@ -95,7 +95,7 @@ export default function IfcViewer({ source, sourceKey, findings, selectedGlobalI
           toggleSection: () => { sectionEnabled = !sectionEnabled; for (const mesh of root.children as import("three").Mesh[]) (mesh.material as import("three").MeshStandardMaterial).clippingPlanes = sectionEnabled ? [plane] : []; return sectionEnabled; },
           setSelected: (globalId) => { visual.selectedGlobalId = globalId; visual.hoveredGlobalId = undefined; setInternalSelectedId(globalId); setHovered(null); applyVisual(); },
           recolour: (next) => { currentFindings = next; applyVisual(); },
-          dispose: () => { disposed = true; cancelAnimationFrame(animation); cancelAnimationFrame(pointerFrame); canvas.removeEventListener("mousemove", move); canvas.removeEventListener("mouseleave", leave); canvas.removeEventListener("click", select); window.removeEventListener("keydown", keydown); orbit.dispose(); root.traverse((object) => { if (object instanceof THREE.Mesh) { object.geometry.dispose(); (object.material as import("three").Material).dispose(); } }); renderer.dispose(); },
+          dispose: () => { disposed = true; cancelAnimationFrame(animation); cancelAnimationFrame(pointerFrame); canvas.removeEventListener("mouseenter", enter); canvas.removeEventListener("mousemove", move); canvas.removeEventListener("mouseleave", leave); canvas.removeEventListener("click", select); window.removeEventListener("keydown", keydown); orbit.dispose(); root.traverse((object) => { if (object instanceof THREE.Mesh) { object.geometry.dispose(); (object.material as import("three").Material).dispose(); } }); renderer.dispose(); },
         };
         applyVisual(); setState("ready"); setMessage(locale === "zh" ? `${root.children.length} 个几何片段 · 悬停预览，单击选中` : `${root.children.length} geometry fragments · hover to preview, click to select`);
         const resize = () => { const width = canvas.clientWidth; const height = canvas.clientHeight; if (canvas.width !== width * renderer.getPixelRatio() || canvas.height !== height * renderer.getPixelRatio()) { renderer.setSize(width, height, false); camera.aspect = width / Math.max(height, 1); camera.updateProjectionMatrix(); } };
@@ -112,7 +112,7 @@ export default function IfcViewer({ source, sourceKey, findings, selectedGlobalI
   return <div className="ifc-viewer">
     <canvas ref={canvasRef} tabIndex={0} aria-label={locale === "zh" ? "可交互 IFC 三维模型" : "Interactive IFC three-dimensional model"} />
     <div className={`viewer-state viewer-${state}`}><i />{message || (locale === "zh" ? "请选择模型" : "Select a model")}</div>
-    <div className="viewer-diagnostics" data-testid="viewer-diagnostics" data-mode={internalSelectedId ? "selected" : hovered ? "hovered" : "normal"} data-selected={internalSelectedId ?? ""} data-hovered={hovered?.globalId ?? ""} aria-hidden="true" />
+    <div className="viewer-diagnostics" data-testid="viewer-diagnostics" data-mode={internalSelectedId ? "selected" : hovered ? "hovered" : pointerInside ? "discovery" : "normal"} data-selected={internalSelectedId ?? ""} data-hovered={hovered?.globalId ?? ""} data-pointer-inside={pointerInside ? "true" : "false"} aria-hidden="true" />
     {hovered && !internalSelectedId && <div className="element-tooltip" style={{ left: tooltip.x, top: tooltip.y }}><strong>{hovered.name}</strong><span>{hovered.entityType}</span><code>{hovered.globalId}</code><small>{hoverFinding ? hoverFinding.status.replace("_", " ") : (locale === "zh" ? "无适用的启用规则" : "No applicable active rule")}</small></div>}
     <div className="viewer-tools" role="toolbar" aria-label={locale === "zh" ? "模型查看工具" : "Model viewing tools"}>
       <button onClick={() => controlsRef.current?.fit()} title={locale === "zh" ? "适应视图" : "Fit model"}>⌂</button>

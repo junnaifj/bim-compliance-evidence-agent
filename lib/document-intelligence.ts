@@ -41,6 +41,14 @@ export const officialRuleSources = [
     note: { en: "Official publication page. The full document is not redistributed in this public repository.", zh: "官方发布页面；本公开仓库不再分发完整文件。" },
     redistribution: false,
   },
+  {
+    id: "hkbd-bimsps-2023",
+    title: { en: "Buildings Department — BIM in Statutory Plan Submissions 2023", zh: "香港屋宇署—法定图则呈交 BIM 指引 2023" },
+    publisher: "Buildings Department, HKSAR Government",
+    url: "https://www.bd.gov.hk/doc/en/resources/codes-and-references/code-and-design-manuals/BIMSPS_e.pdf",
+    note: { en: "Official guidance for BIM in statutory plan submissions other than General Building Plans. The local manual-test copy is not redistributed.", zh: "有关一般建筑图则以外法定图则呈交的官方 BIM 指引；本地手动测试副本不会随仓库分发。" },
+    redistribution: false,
+  },
 ] as const;
 
 async function digest(buffer: ArrayBuffer): Promise<string> {
@@ -92,13 +100,18 @@ export async function readRuleDocument(file: File): Promise<RuleDocument> {
   } else if (extension === "xls") {
     throw new Error("Legacy XLS is not parsed in-browser. Save it as XLSX or CSV to retain a safer, bounded import path.");
   } else if (extension === "pdf") {
-    const pdfjs = await import("pdfjs-dist/build/pdf.mjs"); const pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer), disableWorker: true }).promise;
-    const pages: string[] = [];
-    for (let pageNumber = 1; pageNumber <= Math.min(pdf.numPages, 120); pageNumber += 1) {
-      const content = await (await pdf.getPage(pageNumber)).getTextContent();
-      pages.push(`[Page ${pageNumber}]\n${content.items.map((item: { str?: string }) => item.str ?? "").join(" ")}`);
+    try {
+      const pdfjs = await import("pdfjs-dist/build/pdf.mjs"); const pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer), disableWorker: true }).promise;
+      const pages: string[] = []; const extractionLimit = Math.min(pdf.numPages, 25);
+      for (let pageNumber = 1; pageNumber <= extractionLimit; pageNumber += 1) {
+        const content = await (await pdf.getPage(pageNumber)).getTextContent();
+        pages.push(`[Page ${pageNumber}]\n${content.items.map((item: { str?: string }) => item.str ?? "").join(" ")}`);
+      }
+      extractedText = pages.join("\n\n");
+      if (pdf.numPages > extractionLimit) warnings.push(`Text extraction was bounded to the first ${extractionLimit} of ${pdf.numPages} pages for responsive in-browser review. The complete original remains available in the preview.`);
+    } catch {
+      warnings.push("Text extraction is unavailable for this PDF, for example because copying is restricted or the document uses unsupported encoding. The original remains available in the private preview; use an authorised OCR copy for catalogue extraction.");
     }
-    extractedText = pages.join("\n\n");
   } else if (extension === "dwg") {
     throw new Error("DWG requires an authorised ODA or Autodesk conversion connector. Convert it to DXF or PDF for this assessment build.");
   } else throw new Error("Unsupported rule-source format. Use PDF, DOCX, XLSX, CSV, text, JSON, YAML, IDS, IFC or DXF.");
