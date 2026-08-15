@@ -75,6 +75,16 @@ npm run dev
 
 OpenAI is optional. Copy `.env.example` to `.env.local` to configure an operator-managed server key, or select **OpenAI → My session API key** in the Agent workspace to test with your own separately billed API account. Never paste a key into source code, Git, an issue or a chat message. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
+## Connect your own OpenAI API key
+
+1. Sign in to the [OpenAI Platform API key page](https://platform.openai.com/api-keys). This is separate from a normal ChatGPT or Codex subscription.
+2. Select the appropriate OpenAI project and choose **Create new secret key**. Use a dedicated, restricted key for this assessment where your account permits it.
+3. Copy the secret immediately. OpenAI shows the full value only when it is created; if it is lost, revoke it and create a replacement.
+4. In Evidence Agent, open **Agent**, select **OpenAI**, then **My session API key**. Paste the key into the masked field and choose **Test connection**.
+5. Use **Clear key** when finished. The application keeps a BYOK value only in page memory and does not write it to project memory, browser storage, source files or the Agent trace.
+
+API use is billed through the selected OpenAI Platform project. Do not paste a real key into GitHub, screenshots, email, issue trackers or chat messages.
+
 Quality gates:
 
 ```bash

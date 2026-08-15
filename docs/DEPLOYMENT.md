@@ -17,6 +17,8 @@ npm run dev
 
 Open `/`, choose **Agent → OpenAI**, select the authentication method and model, then use **Test connection**. For BYOK testing, type the key only into the masked field in the local application—not into an issue, terminal transcript or chat message.
 
+Create and manage personal or project-scoped keys at <https://platform.openai.com/api-keys>. The full secret is displayed only at creation time. If it was not saved, revoke the old key and create a replacement; an existing secret cannot be revealed again.
+
 The model receives the user's question, recent conversation messages, structured findings and active rule metadata. Raw IFC bytes and uploaded PDF/DOCX/XLSX source files remain in the browser and are not sent by this Agent endpoint.
 
 Before publication, run `npm run preupload`, configure the Sites runtime secret separately, deploy the tested commit, and repeat the connection and fallback browser smoke tests against the published URL.

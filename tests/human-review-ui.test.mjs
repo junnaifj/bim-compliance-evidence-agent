@@ -10,6 +10,6 @@ test("review UI keeps machine verdict separate and exposes preview-confirm-undo"
 
 test("agent composer exposes agent-provider-model controls and session-only BYOK", async () => {
   const source = await readFile(new URL("../components/CodexAgentWorkspace.tsx", import.meta.url), "utf8");
-  for (const label of ["Select agent", "Select provider", "Select model", "Shift+Enter", "Proposal only", "选择模型", "type=\"password\"", "Clear key", "My session API key"]) assert.ok(source.includes(label), `missing ${label}`);
+  for (const label of ["Select agent", "Select provider", "Select model", "Shift+Enter", "Proposal only", "选择模型", "type=\"password\"", "Clear key", "My session API key", "https://platform.openai.com/api-keys"]) assert.ok(source.includes(label), `missing ${label}`);
   assert.doesNotMatch(source, /localStorage|sessionStorage|document\.cookie/);
 });
