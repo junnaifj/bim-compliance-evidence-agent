@@ -13,8 +13,9 @@ The complete demonstration works without an API key:
 3. Run two deterministic checks. Move the pointer over the model to keep every reviewed element status-coloured while unreviewed shells become transparent grey. The picker indexes every streamed IFC product, searches the complete ray and prefers reviewed semantic elements. Repeated clicks at one point cycle through occluded elements. A selection isolates one GlobalId and filters its findings; click empty space or press Escape to clear.
 4. Propose a natural-language rule. The Agent checks feasibility and the active catalogue before asking whether to replace the existing rule, keep both with distinct scope, or cancel.
 5. Upload a PDF, DOCX, XLSX, CSV, IDS, IFC, DXF or text rule source. The document workspace reports extraction status, page and character evidence, previews the original, creates deterministic numerical drafts and lists non-executable requirement passages for optional conflict review.
-6. Inspect the plan–act–verify trace, project memory and provider registry.
-7. Tell the in-app Report Agent—in ordinary English or Chinese—who will read the report and what it should emphasise. Review its editable brief and generate without copying a prompt. Export is enabled only after identifiers, verdicts and numerical claims pass verification.
+6. Select a finding and record a human disposition independently from the read-only machine verdict. Correct structured evidence only with a named reviewer, provenance and reason; inspect the before/after impact, confirm it explicitly, rerun the affected checks and undo it if necessary. The source IFC is never overwritten.
+7. Work with the Codex-style Evidence Agent in one continuous thread. Agent, provider and model controls sit in the composer; unconfigured external models are visibly unavailable, and every rule or evidence change remains a proposal until human confirmation.
+8. Tell the in-app Report Agent—in ordinary English or Chinese—who will read the report and what it should emphasise. Review its editable brief and generate without copying a prompt. Export is enabled only after identifiers, verdicts and numerical claims pass verification; human dispositions and applied evidence corrections are disclosed separately.
 
 ## Deterministic rules
 
@@ -57,6 +58,8 @@ Extracted clauses remain `DRAFT`. A source page, sheet or text segment is retain
 
 Project memory is device-local, inspectable and erasable. It stores approved rules and decisions, never API keys, and cannot bypass approval. Optional provider entries are deliberately separated from rule truth; the local path always remains available.
 
+Human review is a separate audit layer. It records reviewer dispositions, notes and version history without rewriting machine outcomes. Evidence corrections are applied to an effective review model with source, reason, reviewer and timestamp; the uploaded IFC remains immutable.
+
 ## Development
 
 Requires Node.js 22.13 or later.
@@ -79,7 +82,10 @@ The command runs linting, strict type checking, a production build and the compl
 ```text
 app/                         Bilingual product interface
 components/IfcViewer.tsx     Real web-ifc + Three.js evidence viewer
+components/HumanReviewPanel.tsx Human disposition, evidence correction and undo workflow
+components/CodexAgentWorkspace.tsx Continuous Agent thread and composer controls
 lib/compliance.ts            IFC evidence, rules, conflicts, reports and guardrails
+lib/human-review.ts          Human review records, correction previews and effective model
 lib/document-intelligence.ts Rule-source parsing and official-source registry
 lib/memory.ts                Device-local project and audit memory
 lib/agent.ts                 Provider registry and transparent orchestration trace

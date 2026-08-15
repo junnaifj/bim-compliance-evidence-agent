@@ -11,6 +11,8 @@ export type Door = {
   isExit?: boolean;
   fireRating?: string;
   storey?: string;
+  widthEvidencePath?: string;
+  exitEvidencePath?: string;
 };
 
 export type Space = { expressId: number; globalId: string; name?: string };
@@ -197,7 +199,7 @@ export function parseIfc(text: string, filename: string, source: BuildingModel["
 
 function widthFinding(item: Door, rule: RuleDefinition, locale: Locale): Finding {
   const threshold = rule.threshold ?? 900; const zh = locale === "zh";
-  const base = { id: `${rule.id}-v${rule.version}-${item.globalId}`, ruleId: rule.id, ruleVersion: rule.version, ruleTitle: rule.title[locale], elementId: item.globalId, expressId: item.expressId, elementName: item.name || (zh ? "未命名门" : "Unnamed door"), required: `≥ ${threshold} mm`, thresholdValue: threshold, evidencePath: item.widthSource === "clear_width" ? "Pset_DoorCommon.ClearWidth" : item.widthSource === "overall_width_proxy" ? "IfcDoor.OverallWidth" : "No usable width property", nextStep: "" };
+  const base = { id: `${rule.id}-v${rule.version}-${item.globalId}`, ruleId: rule.id, ruleVersion: rule.version, ruleTitle: rule.title[locale], elementId: item.globalId, expressId: item.expressId, elementName: item.name || (zh ? "未命名门" : "Unnamed door"), required: `≥ ${threshold} mm`, thresholdValue: threshold, evidencePath: item.widthEvidencePath ?? (item.widthSource === "clear_width" ? "Pset_DoorCommon.ClearWidth" : item.widthSource === "overall_width_proxy" ? "IfcDoor.OverallWidth" : "No usable width property"), nextStep: "" };
   if (item.isExit === false) return { ...base, status: "NOT_APPLICABLE", message: zh ? "该构件已明确标记为非疏散门。" : "The element is explicitly not classified as an exit door.", observed: zh ? "非疏散门" : "Not an exit door", reliability: "EXPLICIT", nextStep: zh ? "本规则无需处理。" : "No action is required under this rule." };
   if (item.isExit === undefined) return { ...base, status: "REVIEW", message: zh ? "模型未提供疏散门适用性证据，不能安全作出宽度判定。" : "Exit-door applicability is not evidenced, so a width verdict would be unsafe.", observed: zh ? "缺少疏散门状态" : "Exit status missing", reliability: "MISSING", nextStep: zh ? "请设计团队确认该门是否位于逃生路径。" : "Ask the design team to confirm whether this door serves an escape route." };
   if (item.widthMm === undefined) return { ...base, status: "REVIEW", message: zh ? "该门是疏散门，但没有可用宽度证据。" : "The door is an exit, but no usable width evidence was found.", observed: zh ? "缺少宽度" : "Width missing", reliability: "MISSING", nextStep: zh ? "请提供净开口测量值或已批准门表数据。" : "Provide a clear-opening measurement or an approved schedule value." };
@@ -255,9 +257,15 @@ export function compareModels(before: BuildingModel, after: BuildingModel, rules
   return { items, resolved: items.filter((item) => item.kind === "resolved").length, regressed: items.filter((item) => item.kind === "regressed").length, changed: items.filter((item) => item.kind !== "unchanged").length, unchanged: items.filter((item) => item.kind === "unchanged").length };
 }
 
-export function buildReport(model: BuildingModel, findings: Finding[], locale: Locale): string {
+function buildReportBase(model: BuildingModel, findings: Finding[], locale: Locale): string {
   const zh = locale === "zh"; const counts = Object.fromEntries(["FAIL", "REVIEW", "PASS", "NOT_APPLICABLE"].map((status) => [status, findings.filter((item) => item.status === status).length]));
   return `# ${zh ? "BIM 合规证据预审报告" : "BIM Compliance Evidence Pre-review"}\n\n**${zh ? "模型" : "Model"}:** ${model.name}  \n**Schema:** ${model.schema}  \n**${zh ? "单位" : "Units"}:** ${model.units}  \n**${zh ? "生成时间" : "Generated"}:** ${new Date().toISOString()}\n\n## ${zh ? "摘要" : "Summary"}\n\n${zh ? `完成 ${findings.length} 项检查：${counts.FAIL} 项不通过，${counts.REVIEW} 项需要人工复核，${counts.PASS} 项通过。` : `${findings.length} checks completed: ${counts.FAIL} failed, ${counts.REVIEW} require professional review and ${counts.PASS} passed.`}\n\n## ${zh ? "可追溯检查结果" : "Traceable findings"}\n\n${findings.map((item) => `### [${item.status}] ${item.elementName} — ${item.ruleTitle}\n\n${item.message}\n\n- GlobalId: \`${item.elementId}\`\n- ${zh ? "观测值" : "Observed"}: ${item.observed}\n- ${zh ? "要求" : "Required"}: ${item.required}\n- ${zh ? "证据" : "Evidence"}: \`${item.evidencePath}\`\n- ${zh ? "可靠性" : "Reliability"}: ${item.reliability}\n- ${zh ? "下一步" : "Next step"}: ${item.nextStep}`).join("\n\n")}\n\n---\n${zh ? "本工具仅支持专业预审，不构成法定认证，也不能替代合资格专业人士。" : "This tool supports professional pre-review. It does not certify statutory compliance or replace a suitably qualified professional."}\n`;
+}
+
+export function buildReport(model: BuildingModel, findings: Finding[], locale: Locale, human?: { reviews: { elementId:string; disposition:string }[]; overrides: { elementId:string; field:string; provenance:string; status:string }[] }): string {
+  const base = buildReportBase(model, findings, locale); if (!human) return base;
+  const lines = findings.flatMap((finding) => { const review = human.reviews.filter((record) => record.elementId === finding.elementId).at(-1); const corrections = human.overrides.filter((record) => record.elementId === finding.elementId && record.status === "APPLIED"); if (!review && !corrections.length) return []; return [`- ${finding.elementId}: ${review ? `${locale === "zh" ? "人工状态" : "human disposition"} ${review.disposition}` : ""}${review && corrections.length ? "; " : ""}${corrections.length ? `${locale === "zh" ? "有效证据修订" : "applied evidence correction"} ${corrections.map((record) => `${record.field} · ${record.provenance}`).join("; ")}` : ""}`]; });
+  if (!lines.length) return base; const heading = locale === "zh" ? "## 人工复核与证据修订（不覆盖机器结论）" : "## Human review and evidence corrections (machine verdicts remain separate)"; return base.replace("\n---\n", `\n${heading}\n\n${lines.join("\n")}\n\n---\n`);
 }
 
 export function verifyReport(report: string, findings: Finding[]): { valid: boolean; issues: string[] } {

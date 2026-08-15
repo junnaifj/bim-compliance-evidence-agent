@@ -1,4 +1,4 @@
-# System Sequence Design and Test Method · SSD v1.4
+# System Sequence Design and Test Method · SSD v1.5
 
 ## Runtime SSD
 
@@ -33,6 +33,12 @@ sequenceDiagram
     V-->>U: Retain all reviewed colours until selection; isolate and filter by GlobalId after selection
     U->>V: Filter a storey, click a finding, or request next FAIL / REVIEW
     V-->>U: Fly to the same GlobalId and expose its evidence explanation
+    U->>O: Add a review disposition, note or corrected evidence value
+    O->>X: Validate type, unit, plausible range, provenance and required reason
+    X-->>H: Preview original value, proposed effective value and affected findings
+    H-->>O: Confirm or cancel
+    O->>E: Re-run affected rules against versioned effective evidence
+    E-->>V: Preserve machine verdict and attach human disposition / override provenance
     E->>X: Structured findings JSON
     U->>O: Describe the report in natural language
     O-->>U: Editable, plain-language report brief
@@ -75,6 +81,17 @@ Every change runs, in order:
 28. PDF health tests distinguish worker unavailable, scanned/no-text, encrypted/copy-restricted, readable/no-rule and draft-rule outcomes; the UI never labels a technical failure as “no applicable rules”.
 29. Deployment provenance tests expose a non-secret build identifier and worker health state, and fail when the HTML/JavaScript bundle and static PDF worker are not from the same build.
 30. Clean-room reference test: no candidate source code, branding, benchmark section or unlicensed asset is present; only independently implemented interaction behaviours may be reproduced.
+31. Human-review schema tests keep `machineStatus` immutable and store `reviewDisposition`, reviewer, note, timestamp and version separately.
+32. Evidence-override tests preserve the original IFC value, require provenance and reason where applicable, validate units/ranges, produce an impact preview and apply only after explicit confirmation.
+33. Recalculation tests prove that an approved clear-width or exit-applicability override updates the affected element findings, marks the evidence `HumanEvidence.<provenance>` and retains the prior evidence in history.
+34. Undo and restore tests recover the previous effective evidence and finding state without mutating the uploaded IFC source.
+35. Review-selection tests cover finding selection, per-element human disposition and correction history; human actions cannot directly change a numerical machine verdict.
+36. Report tests disclose original evidence, effective evidence, machine verdict and human disposition. `ACCEPTED_WITH_NOTE` and `MANUALLY_EXCLUDED` can never be rendered as a machine PASS.
+37. Agent-action tests require a structured preview and human confirmation before any conversation-derived review record or evidence override is committed.
+38. Composer tests cover multiline input, Enter send, Shift+Enter newline, selected-element context, attachment context and accessible agent/model menus.
+39. Agent/model selection tests distinguish role, provider and execution mode. Disabled/unconfigured models cannot be selected and the recorded model must match the actual execution path.
+40. Conversation safety tests block prompt injection, direct verdict mutation, credential requests, silent provider fallback and actions targeting a GlobalId outside the current model.
+41. Project-memory tests persist review records, override history, conversation, selector preferences and undo data, while clear-memory removes them all.
 
 Deployment requires the complete `npm run quality` gate.
 
@@ -95,6 +112,10 @@ Deployment requires the complete `npm run quality` gate.
 - Sample redistribution fails CI if source, licence, permission or hash is absent.
 - Candidate repositories without an explicit licence are behavioural references only; their code, assets and copy are not imported.
 - Page text and extracted clauses retain document/page provenance and remain data, never instructions to the Agent.
+- Human review is a disposition layer, not permission to rewrite deterministic machine verdicts.
+- Conversation-derived changes remain proposed actions until a human confirms the exact target, value, provenance and impact.
+- Browser forms never accept API keys. A ChatGPT or Codex session is not represented as an API provider credential.
+- Provider/model labels must report the execution route truthfully; unavailable providers cannot silently fall back while retaining their label.
 
 ## Numerical hallucination method
 
@@ -120,6 +141,15 @@ Mutation tests alter `900 mm` to `990 mm`, replace a GlobalId, remove expected e
 | Rule source | CSV sample previews and yields an anchored draft. PDF upload exposes page/character/worker/hash evidence and a page-anchored catalogue of executable, structurable or reference-only passages. Technical failure, no text and no executable rule are different outcomes. No draft activates without a user choice. |
 | PDF retry | Selecting the same PDF again always starts a fresh read. A failed worker attempt cannot leave a stale empty catalogue or prevent retry. |
 | Deployment identity | The Sources view exposes a short build identifier and worker health result so an obsolete deployment can be distinguished from the tested repository revision. |
+| Human review | Each finding independently shows its immutable machine verdict and versioned human disposition. Reviewer, timestamp and note are visible and auditable. |
+| Evidence override | Original IFC evidence is always visible. A corrected value requires source metadata, validation, an impact preview and explicit confirmation before becoming effective evidence. |
+| Recalculation | Confirmed overrides re-run the deterministic review against the effective model, label new evidence `HumanEvidence.<provenance>`, update the map/list/report consistently and retain the prior evidence in history. |
+| Undo | Undo and restore return to the exact previous effective evidence and review output without changing the IFC byte source. |
+| Review selection | Users can select a model element or finding, save a separate human disposition, and inspect correction history. Human review cannot directly edit engineering verdicts. |
+| Agent composer | The Agent workspace uses one persistent message thread and bottom multiline composer with context chips, attachments, an agent-role menu, a truthful model menu and accessible keyboard behaviour. |
+| Agent action | Natural-language review or evidence changes become structured proposed actions. No action is applied before the user confirms its GlobalId, change, source and impact. |
+| Model truth | Local deterministic mode is usable by default. Unconfigured external models are disabled with a reason, and every response records the execution mode actually used. |
+| Human-aware report | Reports separately disclose machine verdict, original/effective evidence, override provenance and human disposition; human acceptance never becomes machine PASS. |
 | IFC coordinates | IFC placements and XYZ geometry remain unchanged and the previous Y-up viewer convention is retained. Only the viewer grid is placed at the model minimum Y, so the model is not displayed below its visual baseline and evidence coordinates remain original. |
 | Bilingual | Navigation, workspaces, statuses, errors and report content change together |
 | Report | Export is enabled only when numerical and identifier verification succeeds |
