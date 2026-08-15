@@ -14,10 +14,19 @@ export type RuleDocument = {
   licence: string;
   rules: RuleDefinition[];
   warnings: string[];
-  extractionStatus: "EXTRACTION_ERROR" | "TEXT_EXTRACTED_NO_RULES" | "DRAFT_RULES_EXTRACTED";
+  extractionStatus: "EXTRACTION_ERROR" | "NO_MACHINE_TEXT" | "TEXT_EXTRACTED_NO_RULES" | "DRAFT_RULES_EXTRACTED";
   pageCount?: number;
   characterCount: number;
   candidatePassages: string[];
+  passages: RequirementPassage[];
+  workerStatus: "NOT_REQUIRED" | "READY" | "FAILED";
+};
+
+export type RequirementPassage = {
+  text: string;
+  sourceAnchor: string;
+  classification: "EXECUTABLE" | "STRUCTURABLE" | "REFERENCE_ONLY";
+  missing: string[];
 };
 
 export const officialRuleSources = [
@@ -62,10 +71,24 @@ async function digest(buffer: ArrayBuffer): Promise<string> {
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character] ?? character);
 
-export function extractRequirementPassages(text: string): string[] {
+export function catalogueRequirementPassages(text: string): RequirementPassage[] {
   const unsafeInstruction = /(ignore (?:all|previous)|reveal (?:api|secret|password)|system prompt|mark all .* compliant)/i;
-  return text.split(/\n|(?<=[.;。；])\s+/).map((item) => item.replace(/^\[Page \d+\]\s*/, "").replace(/\s+/g, " ").trim()).filter((item) => item.length >= 30 && item.length <= 800 && /(shall|must|required|should|not less|minimum|须|应|必须|不得)/i.test(item) && !unsafeInstruction.test(item)).slice(0, 12);
+  let currentPage: number | undefined;
+  const passages: RequirementPassage[] = [];
+  for (const raw of text.split(/\n|(?<=[.;。；])\s+/)) {
+    const page = raw.match(/^\[Page (\d+)\]\s*/i); if (page) currentPage = Number(page[1]);
+    const item = raw.replace(/^\[Page \d+\]\s*/, "").replace(/\s+/g, " ").trim();
+    if (item.length < 30 || item.length > 800 || !/(shall|must|required|should|not less|minimum|须|应|必须|不得|至少)/i.test(item) || unsafeInstruction.test(item)) continue;
+    const hasTarget = /(door|exit|egress|room|space|wall|beam|门|出口|疏散|房间|空间|墙|梁)/i.test(item);
+    const hasMetric = /\d+(?:\.\d+)?\s*(?:mm|毫米|m|米)\b/i.test(item);
+    const missing = [!hasTarget && "target element", !hasMetric && "measurable threshold"].filter(Boolean) as string[];
+    passages.push({ text: item, sourceAnchor: currentPage ? `Page ${currentPage}` : "Document text", classification: hasTarget && hasMetric ? "EXECUTABLE" : hasTarget ? "STRUCTURABLE" : "REFERENCE_ONLY", missing });
+    if (passages.length === 20) break;
+  }
+  return passages;
 }
+
+export const extractRequirementPassages = (text: string): string[] => catalogueRequirementPassages(text).map((item) => item.text);
 
 async function loadPdfJs() {
   const pdfjs = await import("pdfjs-dist/build/pdf.mjs");
@@ -76,10 +99,25 @@ async function loadPdfJs() {
   return pdfjs;
 }
 
+export async function verifyPdfWorker(): Promise<{ status: "READY" | "FAILED"; url: string; detail: string }> {
+  const url = typeof location === "undefined" ? "/pdf.worker.min.mjs" : new URL("/pdf.worker.min.mjs", location.origin).href;
+  try {
+    const response = await fetch(url, { method: "GET", cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const bytes = Number(response.headers.get("content-length") ?? 0);
+    return { status: "READY", url, detail: bytes ? `${bytes.toLocaleString()} bytes` : "asset reachable" };
+  } catch (error) {
+    return { status: "FAILED", url, detail: error instanceof Error ? error.message : "worker asset unavailable" };
+  }
+}
+
 export function extractRulesFromText(text: string, sourceDocumentId: string): RuleDefinition[] {
-  const candidates = text.split(/\n|(?<=[.;。；])\s+/).map((item) => item.trim()).filter((item) => item.length > 12);
+  const candidates = text.split(/\n|(?<=[.;。；])\s+/).map((item) => item.trim());
   const rules: RuleDefinition[] = [];
+  let pageNumber: number | undefined;
   for (const [index, sentence] of candidates.entries()) {
+    const page = sentence.match(/^\[Page (\d+)\]/i); if (page) pageNumber = Number(page[1]);
+    if (sentence.length <= 12) continue;
     const door = /(door|exit|egress|门|出口|疏散)/i.test(sentence);
     const width = /(width|clear opening|净宽|宽度)/i.test(sentence);
     const metric = sentence.match(/(\d+(?:\.\d+)?)\s*(mm|毫米|m|米)\b/i);
@@ -90,7 +128,7 @@ export function extractRulesFromText(text: string, sourceDocumentId: string): Ru
       id: `EXTRACTED-${sourceDocumentId.slice(-6).toUpperCase()}-${String(rules.length + 1).padStart(3, "0")}`, version: 1,
       title: { en: `Extracted door-width requirement · ${threshold} mm`, zh: `提取的门宽要求 · ${threshold} 毫米` },
       description: { en: sentence, zh: sentence }, authority: "Unverified extracted source", jurisdiction: "Requires confirmation",
-      sourceDocumentId, sourceAnchor: `Text segment ${index + 1}`, target: "IfcDoor", field: "clearWidth", operator: ">=", threshold, unit: "mm",
+      sourceDocumentId, sourceAnchor: pageNumber ? `Page ${pageNumber} · text segment ${index + 1}` : `Text segment ${index + 1}`, target: "IfcDoor", field: "clearWidth", operator: ">=", threshold, unit: "mm",
       scope: /(exit|egress|出口|疏散)/i.test(sentence) ? "Exit or egress doors" : "Requires confirmation", exceptions: [], missingEvidencePolicy: "REVIEW", severity: "HIGH", status: "DRAFT", extractionConfidence: 0.78,
     });
   }
@@ -103,7 +141,7 @@ export async function readRuleDocument(file: File): Promise<RuleDocument> {
   // pdf.js may transfer/detach the supplied ArrayBuffer. Capture the evidence hash
   // before any parser receives it so the audit record can never degrade to the
   // SHA-256 of an empty buffer after extraction.
-  const hash = await digest(buffer); const id = `doc-${hash.slice(0, 12)}`; let extractedText = ""; let previewHtml = ""; let pageCount: number | undefined; let extractionFailed = false; const warnings: string[] = [];
+  const hash = await digest(buffer); const id = `doc-${hash.slice(0, 12)}`; let extractedText = ""; let previewHtml = ""; let pageCount: number | undefined; let extractionFailed = false; let workerStatus: RuleDocument["workerStatus"] = "NOT_REQUIRED"; const warnings: string[] = [];
   const textTypes = ["txt", "md", "csv", "json", "yaml", "yml", "ids", "dxf", "ifc"];
   if (textTypes.includes(extension)) {
     extractedText = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
@@ -122,6 +160,8 @@ export async function readRuleDocument(file: File): Promise<RuleDocument> {
     throw new Error("Legacy XLS is not parsed in-browser. Save it as XLSX or CSV to retain a safer, bounded import path.");
   } else if (extension === "pdf") {
     try {
+      const health = await verifyPdfWorker(); workerStatus = health.status;
+      if (health.status === "FAILED") throw new Error(`[PDF_WORKER_UNAVAILABLE] ${health.url}: ${health.detail}`);
       const pdfjs = await loadPdfJs(); const pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise; pageCount = pdf.numPages;
       const pages: string[] = []; const extractionLimit = Math.min(pdf.numPages, 25);
       for (let pageNumber = 1; pageNumber <= extractionLimit; pageNumber += 1) {
@@ -137,7 +177,7 @@ export async function readRuleDocument(file: File): Promise<RuleDocument> {
   } else if (extension === "dwg") {
     throw new Error("DWG requires an authorised ODA or Autodesk conversion connector. Convert it to DXF or PDF for this assessment build.");
   } else throw new Error("Unsupported rule-source format. Use PDF, DOCX, XLSX, CSV, text, JSON, YAML, IDS, IFC or DXF.");
-  if (!extractedText.trim()) warnings.push("No machine-readable text was found. OCR or manual transcription may be required.");
-  const previewUrl = extension === "pdf" ? URL.createObjectURL(file) : undefined; const rules = extractRulesFromText(extractedText, id); const candidatePassages = extractRequirementPassages(extractedText); const extractionStatus = extractionFailed ? "EXTRACTION_ERROR" : rules.length ? "DRAFT_RULES_EXTRACTED" : "TEXT_EXTRACTED_NO_RULES";
-  return { id, name: file.name, mime: file.type || `application/${extension}`, size: file.size, hash, previewUrl, previewHtml, extractedText, source: "uploaded", licence: "User-supplied; not redistributed", rules, warnings, extractionStatus, pageCount, characterCount: extractedText.length, candidatePassages };
+  if (!extractedText.trim()) warnings.push("No machine-readable text was found. The PDF may be scanned, encrypted or copy-restricted; authorised OCR or manual transcription may be required.");
+  const previewUrl = extension === "pdf" ? URL.createObjectURL(file) : undefined; const rules = extractRulesFromText(extractedText, id); const passages = catalogueRequirementPassages(extractedText); const candidatePassages = passages.map((item) => item.text); const extractionStatus = extractionFailed ? "EXTRACTION_ERROR" : !extractedText.trim() ? "NO_MACHINE_TEXT" : rules.length ? "DRAFT_RULES_EXTRACTED" : "TEXT_EXTRACTED_NO_RULES";
+  return { id, name: file.name, mime: file.type || `application/${extension}`, size: file.size, hash, previewUrl, previewHtml, extractedText, source: "uploaded", licence: "User-supplied; not redistributed", rules, warnings, extractionStatus, pageCount, characterCount: extractedText.length, candidatePassages, passages, workerStatus };
 }

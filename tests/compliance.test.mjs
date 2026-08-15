@@ -67,6 +67,7 @@ test("real Duplex and Clinic samples preserve expected entity counts", async () 
   const duplex = parseIfc(await readFile(new URL("../public/samples/duplex-xeokit.ifc", import.meta.url), "utf8"), "duplex-xeokit.ifc", "sample");
   const clinic = parseIfc(await readFile(new URL("../public/samples/medical-dental-clinic.ifc", import.meta.url), "utf8"), "medical-dental-clinic.ifc", "sample");
   assert.deepEqual([duplex.doors.length, duplex.spaces.length], [14, 21]); assert.deepEqual([clinic.doors.length, clinic.spaces.length], [254, 269]);
+  assert.ok(duplex.storeyNames.includes("Level 1")); assert.equal(duplex.doors.filter((door) => door.storey).length, duplex.doors.length);
 });
 
 test("official IFC4 negative control does not invent targets or findings", async () => {

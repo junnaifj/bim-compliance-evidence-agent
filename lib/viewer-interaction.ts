@@ -67,6 +67,18 @@ export function cyclePickCandidate(stack: RayPickCandidate[], selectedGlobalId?:
   return stack[(current + 1) % stack.length];
 }
 
+export function nextFindingByStatus(findings: Pick<Finding, "id" | "status">[], status: Finding["status"], currentId?: string): string | undefined {
+  const queue = findings.filter((item) => item.status === status);
+  if (!queue.length) return undefined;
+  const current = queue.findIndex((item) => item.id === currentId);
+  return queue[(current + 1) % queue.length].id;
+}
+
+export function shouldHandleReviewShortcut(target: EventTarget | null): boolean {
+  if (typeof HTMLElement === "undefined" || !(target instanceof HTMLElement)) return true;
+  return !target.closest("input, textarea, select, [contenteditable='true']");
+}
+
 export type VisualDescriptor = { colourRole: "original" | "status" | "grey"; opacityRole: "original" | "solid" | "dim" | "xray"; emphasised: boolean };
 
 export function describeElementVisual(input: { globalId: string; reviewed: boolean; interaction: ViewerInteraction }): VisualDescriptor {

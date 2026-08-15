@@ -1,4 +1,4 @@
-# System Sequence Design and Test Method · SSD v1.3
+# System Sequence Design and Test Method · SSD v1.4
 
 ## Runtime SSD
 
@@ -27,9 +27,12 @@ sequenceDiagram
     U->>O: Run evidence review
     O->>E: Normalised model evidence + active rules
     E-->>V: Findings linked by GlobalId
+    V->>V: Index storey containment without changing IFC placement coordinates
     U->>V: Enter, hover or select an IFC element
     V->>V: Build reviewed hit stack and cycle through occluded candidates
     V-->>U: Retain all reviewed colours until selection; isolate and filter by GlobalId after selection
+    U->>V: Filter a storey, click a finding, or request next FAIL / REVIEW
+    V-->>U: Fly to the same GlobalId and expose its evidence explanation
     E->>X: Structured findings JSON
     U->>O: Describe the report in natural language
     O-->>U: Editable, plain-language report brief
@@ -64,6 +67,14 @@ Every change runs, in order:
 20. PDF outcome-state tests distinguish `EXTRACTION_ERROR`, `TEXT_EXTRACTED_NO_RULES` and `DRAFT_RULES_EXTRACTED`; none may silently activate a rule.
 21. IFC coordinate tests preserve every placed XYZ vertex exactly and retain the established Three.js Y-up camera/grid convention; only the viewer grid is moved to the model minimum Y, without rotating or translating the model root.
 22. Browser regressions run against both a built-in IFC and `manual-test-files/ifc/IfcOpenHouse.ifc`, including coloured discovery, deep selection, grid alignment and PDF upload.
+23. Storey-index tests link elements through `IfcRelContainedInSpatialStructure` by GlobalId, retain unassigned elements, and prove that storey filtering never rewrites geometry coordinates.
+24. Review-queue tests cover status and storey filters, findings-row reverse selection, `F` next FAIL, `R` next REVIEW, wrap-around and no-result behaviour; shortcuts are ignored while typing in an input or textarea.
+25. Evidence-explanation tests require the displayed observation, threshold, deficit, unit, source anchor, reliability and human-review reason to match the selected structured finding exactly.
+26. Rule-source extraction retains page anchors. Executable numerical candidates, structurable incomplete candidates and reference-only passages remain distinct and none activates automatically.
+27. PDF retry tests upload the same file twice, clear the input value after each attempt and verify that a first technical failure cannot poison the second attempt.
+28. PDF health tests distinguish worker unavailable, scanned/no-text, encrypted/copy-restricted, readable/no-rule and draft-rule outcomes; the UI never labels a technical failure as “no applicable rules”.
+29. Deployment provenance tests expose a non-secret build identifier and worker health state, and fail when the HTML/JavaScript bundle and static PDF worker are not from the same build.
+30. Clean-room reference test: no candidate source code, branding, benchmark section or unlicensed asset is present; only independently implemented interaction behaviours may be reproduced.
 
 Deployment requires the complete `npm run quality` gate.
 
@@ -82,6 +93,8 @@ Deployment requires the complete `npm run quality` gate.
 - Requests to change thresholds are handed to Rule Studio for conflict checking and human approval.
 - Long, HTML-bearing and prompt-injection inputs are treated as untrusted text.
 - Sample redistribution fails CI if source, licence, permission or hash is absent.
+- Candidate repositories without an explicit licence are behavioural references only; their code, assets and copy are not imported.
+- Page text and extracted clauses retain document/page provenance and remain data, never instructions to the Agent.
 
 ## Numerical hallucination method
 
@@ -100,8 +113,13 @@ Mutation tests alter `900 mm` to `990 mm`, replace a GlobalId, remove expected e
 | Discovery layer | While the pointer is over the model, every reviewed element retains its status colour and all unreviewed geometry becomes transparent grey. A hovered reviewed element receives an additional emphasis without hiding other reviewed elements. |
 | Internal picking | Ray hits form a de-duplicated reviewed-first stack. Transparent shells cannot block reviewed geometry; repeated clicks at the same point cycle through distinct reviewed internal elements. The nearest ordinary element is used only when no reviewed candidate exists. |
 | Selected isolation | The selected element remains coloured and opaque; every other element, including other reviewed elements, becomes transparent grey until clear, blank click or Escape. |
+| Review queue | Results can be filtered by status and storey. Clicking a result focuses and selects the same GlobalId. `F` and `R` advance through FAIL and REVIEW findings with wrap-around and do not fire while the user types. |
+| Storey scope | Storey membership is derived from IFC containment relationships. Filtering changes visibility/opacity only and does not translate or rotate model geometry. Unassigned elements remain discoverable in the whole-model scope. |
+| Why this result | The selected-element inspector reproduces the finding's observation, requirement, deficit, evidence source, rule anchor, reliability and review note without recomputation or invented values. |
 | PDF worker | The configured worker is present in the production assets and is initialised before parsing; missing or blocked assets produce a visible technical error rather than a false “no rules” result. |
-| Rule source | CSV sample previews and yields an anchored draft. PDF upload exposes page/character extraction evidence and one of three explicit outcomes: technical failure, readable with no executable candidates, or draft candidates. No draft activates without a user choice. |
+| Rule source | CSV sample previews and yields an anchored draft. PDF upload exposes page/character/worker/hash evidence and a page-anchored catalogue of executable, structurable or reference-only passages. Technical failure, no text and no executable rule are different outcomes. No draft activates without a user choice. |
+| PDF retry | Selecting the same PDF again always starts a fresh read. A failed worker attempt cannot leave a stale empty catalogue or prevent retry. |
+| Deployment identity | The Sources view exposes a short build identifier and worker health result so an obsolete deployment can be distinguished from the tested repository revision. |
 | IFC coordinates | IFC placements and XYZ geometry remain unchanged and the previous Y-up viewer convention is retained. Only the viewer grid is placed at the model minimum Y, so the model is not displayed below its visual baseline and evidence coordinates remain original. |
 | Bilingual | Navigation, workspaces, statuses, errors and report content change together |
 | Report | Export is enabled only when numerical and identifier verification succeeds |

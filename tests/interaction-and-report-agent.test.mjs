@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildPickStack, choosePickCandidate, cyclePickCandidate, describeElementVisual, filterFindingsForSelection, initialViewerInteraction, reduceViewerInteraction } from "../lib/viewer-interaction.ts";
+import { buildPickStack, choosePickCandidate, cyclePickCandidate, describeElementVisual, filterFindingsForSelection, initialViewerInteraction, nextFindingByStatus, reduceViewerInteraction, shouldHandleReviewShortcut } from "../lib/viewer-interaction.ts";
 import { heightAboveBaseline, modelBaselineY, preserveIfcCoordinates } from "../lib/viewer-geometry.ts";
 import { defaultReportBrief, findingsForBrief, interpretReportRequest } from "../lib/report-agent.ts";
 
@@ -62,6 +62,12 @@ test("selected GlobalId filters every finding for that element and no others", (
   assert.deepEqual(filterFindingsForSelection(findings, "G-1").map((item) => item.id), ["a", "b"]);
   assert.equal(filterFindingsForSelection(findings, "G-X").length, 0);
   assert.equal(filterFindingsForSelection(findings).length, 3);
+});
+
+test("review queue advances by status and wraps without inventing a result", () => {
+  assert.equal(nextFindingByStatus(findings, "FAIL"), "a"); assert.equal(nextFindingByStatus(findings, "FAIL", "a"), "a");
+  assert.equal(nextFindingByStatus(findings, "REVIEW"), "b"); assert.equal(nextFindingByStatus(findings, "NOT_APPLICABLE"), undefined);
+  assert.equal(shouldHandleReviewShortcut(null), true);
 });
 
 test("natural language configures an editable report brief", () => {

@@ -22,6 +22,7 @@ export type BuildingModel = {
   schema: string;
   units: "mm" | "m" | "unresolved";
   storeys: number;
+  storeyNames?: string[];
   source: "sample" | "uploaded";
   provenance?: string;
   licence?: string;
@@ -154,6 +155,16 @@ export function parseIfc(text: string, filename: string, source: BuildingModel["
     .flatMap((setId) => propertySets.get(setId) ?? [])
     .map((propertyId) => propertyValues.get(propertyId)).filter(Boolean) as { name: string; value?: string | number | boolean }[];
 
+  const storeyById = new Map<string, string>();
+  for (const [id, line] of entityLines) if (/^IFCBUILDINGSTOREY\s*\(/i.test(line)) {
+    const strings = [...line.matchAll(/'([^']*)'/g)].map((item) => item[1]); storeyById.set(id, strings[1] || strings[0] || `Storey #${id}`);
+  }
+  const elementStorey = new Map<string, string>();
+  for (const line of entityLines.values()) if (/^IFCRELCONTAINEDINSPATIALSTRUCTURE\s*\(/i.test(line)) {
+    const relation = line.match(/,\s*\((#[\d\s,#]+)\)\s*,\s*#(\d+)\s*\)$/i); const storey = relation ? storeyById.get(relation[2]) : undefined;
+    if (relation && storey) for (const match of relation[1].matchAll(/#(\d+)/g)) elementStorey.set(match[1], storey);
+  }
+
   const doors = [...text.matchAll(/#(\d+)\s*=\s*IFCDOOR\s*\(([^;]+);/gi)].map((match, index): Door => {
     const entityId = match[1]; const line = match[0]; const body = match[2].replace(/\)$/, "");
     const args = splitStepArguments(body); const strings = [...line.matchAll(/'([^']*)'/g)].map((item) => item[1]);
@@ -168,6 +179,7 @@ export function parseIfc(text: string, filename: string, source: BuildingModel["
       widthSource: typeof clearWidth === "number" ? "clear_width" : nominalWidth ? "overall_width_proxy" : "missing",
       isExit: typeof fireExit === "boolean" ? fireExit : undefined,
       fireRating: typeof fireRating === "string" && fireRating.trim() ? fireRating : undefined,
+      storey: elementStorey.get(entityId),
     };
   });
 
@@ -179,7 +191,7 @@ export function parseIfc(text: string, filename: string, source: BuildingModel["
   return {
     id: `${source}-${filename}-${text.length}`, name: projectName || filename.replace(/\.ifc$/i, ""), filename, schema,
     units: /IFCSIUNIT\s*\([^;]*\.MILLI\.[^;]*\.METRE\./i.test(text) ? "mm" : /IFCSIUNIT\s*\([^;]*\.METRE\./i.test(text) ? "m" : "unresolved",
-    storeys: Math.max(1, (text.match(/IFCBUILDINGSTOREY\s*\(/gi) ?? []).length), source, doors, spaces, byteLength: text.length,
+    storeys: Math.max(1, storeyById.size), storeyNames: [...new Set(storeyById.values())], source, doors, spaces, byteLength: text.length,
   };
 }
 
