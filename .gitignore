@@ -41,6 +41,7 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+/.project-trash/
 
 # Official HKSAR reference documents are retained for local manual testing only.
 # Government copyright terms do not permit this repository to redistribute them.

@@ -77,6 +77,14 @@ npm run quality
 
 The command runs linting, strict type checking, a production build and the complete deterministic test suite. The same gate runs on every push and pull request.
 
+Before a GitHub upload, run the stricter repository preflight:
+
+```bash
+npm run preupload
+```
+
+It repeats the production quality gate, rejects tracked quarantine or obsolete starter files, checks patch integrity and blocks credential-like text. `.project-trash/` is a local, recoverable quarantine and is never included in Git or deployment packages.
+
 ## Repository map
 
 ```text

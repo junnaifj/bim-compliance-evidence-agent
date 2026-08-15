@@ -13,11 +13,10 @@
     "test:build": "npm run build && npm test",
     "typecheck": "tsc --noEmit",
     "quality": "npm run lint && npm run typecheck && npm run test:build",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "preupload": "bash scripts/preupload.sh",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern .project-trash"
   },
   "dependencies": {
-    "drizzle-orm": "0.45.2",
     "mammoth": "^1.12.1",
     "next": "^16.3.1",
     "pdfjs-dist": "^6.2.108",
@@ -36,7 +35,6 @@
     "@types/three": "^0.185.4",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
-    "drizzle-kit": "0.31.10",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.6",
     "react-server-dom-webpack": "19.2.6",

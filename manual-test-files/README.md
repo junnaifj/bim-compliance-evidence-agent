@@ -35,3 +35,9 @@ Additional, longer statutory-submission guidance:
 - SHA-256: `6e3bb9e0074b1c098c0074b4f8ea6036a5198b93deeb036df7c99ea73f1f0932`
 
 SHA-256 values and parsed entity counts are verified by the automated test suite.
+
+## Concise rule-source fixture
+
+- Local file: `rules/sample-rule-source.csv`
+- Intended test: deterministic CSV preview, source-anchor retention and draft-rule extraction
+- Treatment: safe synthetic test data; no external copyright dependency
