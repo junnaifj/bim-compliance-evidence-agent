@@ -37,18 +37,41 @@ export function filterFindingsForSelection(findings: Finding[], globalId?: strin
   return globalId ? findings.filter((finding) => finding.elementId === globalId) : findings;
 }
 
-export type RayPickCandidate = { globalId: string; expressId: number; distance: number };
+export type RayPickCandidate = { globalId: string; expressId: number; distance: number; selectionPriority?: number };
 
-export function choosePickCandidate(hits: RayPickCandidate[], reviewedGlobalIds: ReadonlySet<string>): RayPickCandidate | undefined {
-  const ordered = [...hits].sort((a, b) => a.distance - b.distance);
-  return ordered.find((hit) => reviewedGlobalIds.has(hit.globalId)) ?? ordered[0];
+export const normaliseGlobalId = (value: string) => value.trim();
+
+export function buildPickStack(hits: RayPickCandidate[], reviewedGlobalIds: ReadonlySet<string>): RayPickCandidate[] {
+  const reviewed = new Set([...reviewedGlobalIds].map(normaliseGlobalId));
+  const nearestByGlobalId = new Map<string, RayPickCandidate>();
+  for (const hit of hits) {
+    const globalId = normaliseGlobalId(hit.globalId); if (!globalId || globalId.startsWith("express-")) continue;
+    const candidate = { ...hit, globalId }; const previous = nearestByGlobalId.get(globalId);
+    if (!previous || candidate.distance < previous.distance) nearestByGlobalId.set(globalId, candidate);
+  }
+  return [...nearestByGlobalId.values()].sort((a, b) => {
+    const reviewedDelta = Number(reviewed.has(b.globalId)) - Number(reviewed.has(a.globalId));
+    if (reviewedDelta) return reviewedDelta;
+    const semanticDelta = (b.selectionPriority ?? 0) - (a.selectionPriority ?? 0);
+    return semanticDelta || a.distance - b.distance;
+  });
 }
 
-export type VisualDescriptor = { colourRole: "original" | "status" | "grey"; opacityRole: "original" | "dim" | "xray"; emphasised: boolean };
+export function choosePickCandidate(hits: RayPickCandidate[], reviewedGlobalIds: ReadonlySet<string>): RayPickCandidate | undefined {
+  return buildPickStack(hits, reviewedGlobalIds)[0];
+}
+
+export function cyclePickCandidate(stack: RayPickCandidate[], selectedGlobalId?: string): RayPickCandidate | undefined {
+  if (!stack.length) return undefined; if (!selectedGlobalId) return stack[0];
+  const current = stack.findIndex((item) => item.globalId === normaliseGlobalId(selectedGlobalId));
+  return stack[(current + 1) % stack.length];
+}
+
+export type VisualDescriptor = { colourRole: "original" | "status" | "grey"; opacityRole: "original" | "solid" | "dim" | "xray"; emphasised: boolean };
 
 export function describeElementVisual(input: { globalId: string; reviewed: boolean; interaction: ViewerInteraction }): VisualDescriptor {
   const { globalId, reviewed, interaction } = input; const selected = interaction.selectedGlobalId === globalId; const hovered = !interaction.selectedGlobalId && interaction.hoveredGlobalId === globalId;
-  if (interaction.selectedGlobalId) return selected ? { colourRole: reviewed ? "status" : "original", opacityRole: "original", emphasised: true } : { colourRole: "grey", opacityRole: "dim", emphasised: false };
-  if (interaction.pointerInside) return reviewed ? { colourRole: "status", opacityRole: "original", emphasised: hovered } : { colourRole: "grey", opacityRole: "dim", emphasised: hovered };
+  if (interaction.selectedGlobalId) return selected ? { colourRole: reviewed ? "status" : "original", opacityRole: "solid", emphasised: true } : { colourRole: "grey", opacityRole: "dim", emphasised: false };
+  if (interaction.pointerInside) return reviewed ? { colourRole: "status", opacityRole: "solid", emphasised: hovered } : { colourRole: "grey", opacityRole: "dim", emphasised: hovered };
   return { colourRole: reviewed ? "status" : "original", opacityRole: interaction.xray ? "xray" : "original", emphasised: false };
 }

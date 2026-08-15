@@ -14,6 +14,10 @@ export type RuleDocument = {
   licence: string;
   rules: RuleDefinition[];
   warnings: string[];
+  extractionStatus: "EXTRACTION_ERROR" | "TEXT_EXTRACTED_NO_RULES" | "DRAFT_RULES_EXTRACTED";
+  pageCount?: number;
+  characterCount: number;
+  candidatePassages: string[];
 };
 
 export const officialRuleSources = [
@@ -58,6 +62,20 @@ async function digest(buffer: ArrayBuffer): Promise<string> {
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character] ?? character);
 
+export function extractRequirementPassages(text: string): string[] {
+  const unsafeInstruction = /(ignore (?:all|previous)|reveal (?:api|secret|password)|system prompt|mark all .* compliant)/i;
+  return text.split(/\n|(?<=[.;。；])\s+/).map((item) => item.replace(/^\[Page \d+\]\s*/, "").replace(/\s+/g, " ").trim()).filter((item) => item.length >= 30 && item.length <= 800 && /(shall|must|required|should|not less|minimum|须|应|必须|不得)/i.test(item) && !unsafeInstruction.test(item)).slice(0, 12);
+}
+
+async function loadPdfJs() {
+  const pdfjs = await import("pdfjs-dist/build/pdf.mjs");
+  if (!pdfjs.GlobalWorkerOptions) throw new Error("[PDF_WORKER_CONFIGURATION] PDF.js did not expose GlobalWorkerOptions.");
+  const workerPath = "/pdf.worker.min.mjs"; const workerUrl = typeof location === "undefined" ? workerPath : new URL(workerPath, location.origin).href;
+  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+  if (!pdfjs.GlobalWorkerOptions.workerSrc) throw new Error("[PDF_WORKER_CONFIGURATION] The PDF worker URL could not be configured.");
+  return pdfjs;
+}
+
 export function extractRulesFromText(text: string, sourceDocumentId: string): RuleDefinition[] {
   const candidates = text.split(/\n|(?<=[.;。；])\s+/).map((item) => item.trim()).filter((item) => item.length > 12);
   const rules: RuleDefinition[] = [];
@@ -85,7 +103,7 @@ export async function readRuleDocument(file: File): Promise<RuleDocument> {
   // pdf.js may transfer/detach the supplied ArrayBuffer. Capture the evidence hash
   // before any parser receives it so the audit record can never degrade to the
   // SHA-256 of an empty buffer after extraction.
-  const hash = await digest(buffer); const id = `doc-${hash.slice(0, 12)}`; let extractedText = ""; let previewHtml = ""; const warnings: string[] = [];
+  const hash = await digest(buffer); const id = `doc-${hash.slice(0, 12)}`; let extractedText = ""; let previewHtml = ""; let pageCount: number | undefined; let extractionFailed = false; const warnings: string[] = [];
   const textTypes = ["txt", "md", "csv", "json", "yaml", "yml", "ids", "dxf", "ifc"];
   if (textTypes.includes(extension)) {
     extractedText = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
@@ -104,7 +122,7 @@ export async function readRuleDocument(file: File): Promise<RuleDocument> {
     throw new Error("Legacy XLS is not parsed in-browser. Save it as XLSX or CSV to retain a safer, bounded import path.");
   } else if (extension === "pdf") {
     try {
-      const pdfjs = await import("pdfjs-dist/build/pdf.mjs"); pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs"; const pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
+      const pdfjs = await loadPdfJs(); const pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise; pageCount = pdf.numPages;
       const pages: string[] = []; const extractionLimit = Math.min(pdf.numPages, 25);
       for (let pageNumber = 1; pageNumber <= extractionLimit; pageNumber += 1) {
         const content = await (await pdf.getPage(pageNumber)).getTextContent();
@@ -112,13 +130,14 @@ export async function readRuleDocument(file: File): Promise<RuleDocument> {
       }
       extractedText = pages.join("\n\n");
       if (pdf.numPages > extractionLimit) warnings.push(`Text extraction was bounded to the first ${extractionLimit} of ${pdf.numPages} pages for responsive in-browser review. The complete original remains available in the preview.`);
-    } catch {
-      warnings.push("Text extraction is unavailable for this PDF, for example because copying is restricted or the document uses unsupported encoding. The original remains available in the private preview; use an authorised OCR copy for catalogue extraction.");
+    } catch (error) {
+      extractionFailed = true; const detail = error instanceof Error ? error.message : "Unknown PDF extraction error";
+      warnings.push(`PDF text extraction failed [PDF_EXTRACTION_ERROR]: ${detail}. The original remains available in the private preview; use an authorised OCR copy if the document is scanned or copy-restricted.`);
     }
   } else if (extension === "dwg") {
     throw new Error("DWG requires an authorised ODA or Autodesk conversion connector. Convert it to DXF or PDF for this assessment build.");
   } else throw new Error("Unsupported rule-source format. Use PDF, DOCX, XLSX, CSV, text, JSON, YAML, IDS, IFC or DXF.");
   if (!extractedText.trim()) warnings.push("No machine-readable text was found. OCR or manual transcription may be required.");
-  const previewUrl = extension === "pdf" ? URL.createObjectURL(file) : undefined;
-  return { id, name: file.name, mime: file.type || `application/${extension}`, size: file.size, hash, previewUrl, previewHtml, extractedText, source: "uploaded", licence: "User-supplied; not redistributed", rules: extractRulesFromText(extractedText, id), warnings };
+  const previewUrl = extension === "pdf" ? URL.createObjectURL(file) : undefined; const rules = extractRulesFromText(extractedText, id); const candidatePassages = extractRequirementPassages(extractedText); const extractionStatus = extractionFailed ? "EXTRACTION_ERROR" : rules.length ? "DRAFT_RULES_EXTRACTED" : "TEXT_EXTRACTED_NO_RULES";
+  return { id, name: file.name, mime: file.type || `application/${extension}`, size: file.size, hash, previewUrl, previewHtml, extractedText, source: "uploaded", licence: "User-supplied; not redistributed", rules, warnings, extractionStatus, pageCount, characterCount: extractedText.length, candidatePassages };
 }

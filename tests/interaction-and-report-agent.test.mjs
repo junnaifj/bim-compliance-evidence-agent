@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { choosePickCandidate, describeElementVisual, filterFindingsForSelection, initialViewerInteraction, reduceViewerInteraction } from "../lib/viewer-interaction.ts";
+import { buildPickStack, choosePickCandidate, cyclePickCandidate, describeElementVisual, filterFindingsForSelection, initialViewerInteraction, reduceViewerInteraction } from "../lib/viewer-interaction.ts";
+import { heightAboveBaseline, modelBaselineY, preserveIfcCoordinates } from "../lib/viewer-geometry.ts";
 import { defaultReportBrief, findingsForBrief, interpretReportRequest } from "../lib/report-agent.ts";
 
 const findings = [
@@ -23,11 +24,32 @@ test("internal reviewed elements take pick priority through an unreviewed shell"
   assert.equal(choosePickCandidate(hits, new Set())?.globalId, "WALL");
 });
 
+test("reviewed semantic elements are de-duplicated and deep hits can be cycled", () => {
+  const hits = [
+    { globalId: " WALL ", expressId: 1, distance: 1, selectionPriority: 30 },
+    { globalId: "DOOR", expressId: 2, distance: 2, selectionPriority: 100 },
+    { globalId: "DOOR", expressId: 2, distance: 2.2, selectionPriority: 100 },
+    { globalId: "WINDOW", expressId: 3, distance: 3, selectionPriority: 90 },
+  ];
+  const stack = buildPickStack(hits, new Set(["WALL", "DOOR", "WINDOW"]));
+  assert.deepEqual(stack.map((item) => item.globalId), ["DOOR", "WINDOW", "WALL"]);
+  assert.equal(cyclePickCandidate(stack)?.globalId, "DOOR");
+  assert.equal(cyclePickCandidate(stack, "DOOR")?.globalId, "WINDOW");
+  assert.equal(cyclePickCandidate(stack, "WALL")?.globalId, "DOOR");
+});
+
 test("discovery keeps every reviewed element coloured and dims unreviewed geometry", () => {
   const interaction = reduceViewerInteraction(initialViewerInteraction, { type: "HOVER", globalId: "DOOR-A" });
-  assert.deepEqual(describeElementVisual({ globalId: "DOOR-A", reviewed: true, interaction }), { colourRole: "status", opacityRole: "original", emphasised: true });
-  assert.deepEqual(describeElementVisual({ globalId: "DOOR-B", reviewed: true, interaction }), { colourRole: "status", opacityRole: "original", emphasised: false });
+  assert.deepEqual(describeElementVisual({ globalId: "DOOR-A", reviewed: true, interaction }), { colourRole: "status", opacityRole: "solid", emphasised: true });
+  assert.deepEqual(describeElementVisual({ globalId: "DOOR-B", reviewed: true, interaction }), { colourRole: "status", opacityRole: "solid", emphasised: false });
   assert.deepEqual(describeElementVisual({ globalId: "WALL", reviewed: false, interaction }), { colourRole: "grey", opacityRole: "dim", emphasised: false });
+});
+
+test("IFC XYZ is preserved while the viewer grid follows the model baseline", () => {
+  assert.deepEqual(preserveIfcCoordinates([12, 7, 3]), [12, 7, 3]);
+  assert.equal(modelBaselineY(-4.25), -4.25); assert.equal(heightAboveBaseline(-4.25, -4.25), 0);
+  const a = preserveIfcCoordinates([0, 0, 0]); const b = preserveIfcCoordinates([3, 4, 12]);
+  assert.equal(Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), 13);
 });
 
 test("selection greys every other element including other reviewed elements", () => {

@@ -10,9 +10,9 @@ The complete demonstration works without an API key:
 
 1. Load the small, licensed **Duplex residence** sample or upload an IFC2x3/IFC4 file.
 2. Orbit, pan and zoom the real IFC geometry; use X-ray and section controls.
-3. Run two deterministic checks. Move the pointer over the model to keep every reviewed element status-coloured while unreviewed shells become transparent grey. The picker searches the complete ray and prefers reviewed internal elements. Click one element to isolate it and filter findings by GlobalId; click empty space or press Escape to clear.
+3. Run two deterministic checks. Move the pointer over the model to keep every reviewed element status-coloured while unreviewed shells become transparent grey. The picker indexes every streamed IFC product, searches the complete ray and prefers reviewed semantic elements. Repeated clicks at one point cycle through occluded elements. A selection isolates one GlobalId and filters its findings; click empty space or press Escape to clear.
 4. Propose a natural-language rule. The Agent checks feasibility and the active catalogue before asking whether to replace the existing rule, keep both with distinct scope, or cancel.
-5. Upload a PDF, DOCX, XLSX, CSV, IDS, IFC, DXF or text rule source. Preview it and send extracted numerical clauses to conflict review.
+5. Upload a PDF, DOCX, XLSX, CSV, IDS, IFC, DXF or text rule source. The document workspace reports extraction status, page and character evidence, previews the original, creates deterministic numerical drafts and lists non-executable requirement passages for optional conflict review.
 6. Inspect the plan–act–verify trace, project memory and provider registry.
 7. Tell the in-app Report Agent—in ordinary English or Chinese—who will read the report and what it should emphasise. Review its editable brief and generate without copying a prompt. Export is enabled only after identifiers, verdicts and numerical claims pass verification.
 
