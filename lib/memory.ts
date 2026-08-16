@@ -1,8 +1,9 @@
 import type { RuleDefinition } from "./compliance";
 import type { ElementEvidenceOverride, HumanReviewRecord } from "./human-review";
+import type { RulePackage } from "./rule-packages";
 
 export type AuditEvent = { id: string; at: string; actor: "user" | "orchestrator" | "model-intake" | "document-agent" | "rule-agent" | "rule-engine" | "verifier" | "report-agent"; kind: string; summary: string; evidence?: string };
-export type ProjectMemory = { projectId: string; jurisdiction: string; reportLanguage: "en" | "zh"; rules: RuleDefinition[]; decisions: { at: string; decision: string; ruleId: string }[]; events: AuditEvent[]; reportBrief?: Record<string, unknown>; reportMessages?: { role: "agent" | "user"; text: string }[]; humanReviews?: HumanReviewRecord[]; evidenceOverrides?: ElementEvidenceOverride[]; agentSelection?: { agentId: string; providerId: string; modelId: string } };
+export type ProjectMemory = { projectId: string; jurisdiction: string; reportLanguage: "en" | "zh"; rules: RuleDefinition[]; decisions: { at: string; decision: string; ruleId: string }[]; events: AuditEvent[]; reportBrief?: Record<string, unknown>; reportMessages?: { role: "agent" | "user"; text: string }[]; humanReviews?: HumanReviewRecord[]; evidenceOverrides?: ElementEvidenceOverride[]; rulePackages?: RulePackage[]; selectedRulePackageId?: string; agentSelection?: { agentId: string; providerId: string; modelId: string } };
 
 const key = (projectId: string) => `evidence-agent:memory:${projectId}`;
 export function emptyMemory(projectId = "assessment-workspace"): ProjectMemory { return { projectId, jurisdiction: "Project", reportLanguage: "en", rules: [], decisions: [], events: [] }; }

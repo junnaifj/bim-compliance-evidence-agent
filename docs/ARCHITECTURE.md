@@ -11,7 +11,7 @@ flowchart LR
     O --> D[Document intelligence]
     O --> R[Rule conflict and feasibility]
     H[Human approval] --> R
-    R --> C[Versioned rule catalogue]
+    R --> C[Versioned rule-package catalogue]
     I --> E[Deterministic compliance engine]
     C --> E
     E --> V[Evidence verifier]
@@ -40,6 +40,24 @@ DRAFT → NEEDS_DECISION → VALIDATED → ACTIVE → SUPERSEDED
 ```
 
 Conflict analysis distinguishes duplicate, stricter, looser and overlapping rules. Approval can replace the active rule, retain both with distinct scope, or cancel. Active records are preserved rather than overwritten.
+
+### Rule-source package lifecycle
+
+An uploaded source is processed independently of any model:
+
+```text
+SOURCE → EXTRACTED ENTRIES → HUMAN EDIT / INCLUDE / REFERENCE / EXCLUDE → READY PACKAGE
+                                                                        ↓
+MODEL ← SELECT ONE PACKAGE ← DETERMINISTIC EXECUTION ← ZERO-APPLICABILITY LOG
+```
+
+Every extracted passage remains in the draft package. Executable rules and reference-only requirements both require an explicit human decision; no extraction activates itself. A READY package is immutable evidence with source anchors, version and confirmation time. Choosing a different package changes the review method, clears stale findings and never merges one source silently into another. A rule with no matching model elements is still recorded as `NO_APPLICABLE_ELEMENTS`, rather than disappearing from the audit.
+
+## Review and report contract
+
+The review path follows a structured IFC pipeline: parse semantic properties and placements, evaluate versioned rules deterministically, join findings and geometry by IFC GlobalId, and expose a separate human disposition layer. Result selection and 3D selection are reciprocal.
+
+The report path keeps the same source of truth but allows the user to select status, rule, storey, selected element, level of detail, audience and language. Local Markdown is always available. Optional AI generates professional narrative only; it receives bounded structured results, cannot alter verdicts and is rejected if its numbers, identifiers or statuses depart from the deterministic evidence.
 
 ## Memory and providers
 

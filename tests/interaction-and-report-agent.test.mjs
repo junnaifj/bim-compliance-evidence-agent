@@ -89,3 +89,15 @@ test("brief filtering cannot promote REVIEW or proxy evidence to PASS", () => {
   const selected = findingsForBrief(findings, defaultReportBrief("en"));
   assert.deepEqual(selected.map((item) => item.status), ["FAIL", "REVIEW"]);
 });
+
+test("report scope filters by rule, storey and selected element without changing findings", () => {
+  const brief = { ...defaultReportBrief("en"), focusStatuses: ["FAIL", "REVIEW", "PASS", "NOT_APPLICABLE"], ruleIds: ["R-2"], storeys: ["Level 2"], selectedElementOnly: true, maxFindings: 100 };
+  const findings = [
+    { status: "FAIL", ruleId: "R-2", elementId: "door-b" },
+    { status: "PASS", ruleId: "R-2", elementId: "door-a" },
+    { status: "FAIL", ruleId: "R-1", elementId: "door-b" },
+  ];
+  const filtered = findingsForBrief(findings, brief, { selectedElementId: "door-b", storeyByElement: { "door-a": "Level 1", "door-b": "Level 2" } });
+  assert.deepEqual(filtered.map((item) => item.elementId), ["door-b"]);
+  assert.equal(findings[0].status, "FAIL");
+});

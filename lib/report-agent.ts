@@ -9,6 +9,11 @@ export type ReportBrief = {
   includeIdentifiers: boolean;
   includeEvidencePaths: boolean;
   includeActions: boolean;
+  includeHumanReview: boolean;
+  selectedElementOnly: boolean;
+  ruleIds: string[];
+  storeys: string[];
+  detail: "summary" | "per-finding";
   maxFindings: number;
   extraInstruction: string;
 };
@@ -21,7 +26,7 @@ export type ReportAgentResult = {
 };
 
 export function defaultReportBrief(locale: Locale): ReportBrief {
-  return { audience: "project-team", language: locale, tone: "concise", focusStatuses: ["FAIL", "REVIEW"], includeIdentifiers: true, includeEvidencePaths: true, includeActions: true, maxFindings: 16, extraInstruction: "" };
+  return { audience: "project-team", language: locale, tone: "concise", focusStatuses: ["FAIL", "REVIEW"], includeIdentifiers: true, includeEvidencePaths: true, includeActions: true, includeHumanReview: true, selectedElementOnly: false, ruleIds: [], storeys: [], detail: "per-finding", maxFindings: 16, extraInstruction: "" };
 }
 
 const has = (input: string, pattern: RegExp) => pattern.test(input.toLowerCase());
@@ -51,16 +56,25 @@ export function interpretReportRequest(input: string, current: ReportBrief, loca
   if (has(text, /(hide|exclude|omit).{0,12}(global.?id|identifier)|不.{0,8}(显示|包括).{0,8}(global.?id|标识)/i)) brief.includeIdentifiers = false;
   if (has(text, /(hide|exclude|omit).{0,12}evidence|不.{0,8}(显示|包括).{0,8}证据/i)) brief.includeEvidencePaths = false;
   if (has(text, /(no action|without action|不.{0,8}(行动|建议))/i)) brief.includeActions = false;
+  if (has(text, /(without|exclude|omit).{0,16}human review|不.{0,8}(显示|包括).{0,8}人工复核/i)) brief.includeHumanReview = false;
+  if (has(text, /(selected (element|finding) only|current element only|只.{0,6}(选中|当前).{0,6}(构件|结果))/i)) brief.selectedElementOnly = true;
+  if (has(text, /(summary only|overview only|只.{0,6}(摘要|概览))/i)) brief.detail = "summary";
+  if (has(text, /(each finding|every finding|per.finding|逐项|每一项|每个结果)/i)) brief.detail = "per-finding";
   const count = text.match(/(?:top|maximum|max|最多|前)\s*(\d{1,3})/i)?.[1]; if (count) brief.maxFindings = Math.min(100, Math.max(1, Number(count)));
   brief.extraInstruction = text.replace(/<[^>]*>/g, "").slice(0, 500);
   return { intent: "configure-report", brief, warnings, reply: zh ? "我已把您的自然语言整理成右侧可编辑的报告简报。请检查受众、语言、重点和证据范围；确认后直接生成，无需复制或粘贴提示词。" : "I have converted your request into the editable report brief on the right. Check its audience, language, focus and evidence scope, then generate directly—there is no prompt to copy or paste." };
 }
 
-export function findingsForBrief(findings: Finding[], brief: ReportBrief): Finding[] {
-  return findings.filter((finding) => brief.focusStatuses.includes(finding.status)).slice(0, brief.maxFindings);
+export function findingsForBrief(findings: Finding[], brief: ReportBrief, context?: { selectedElementId?: string; storeyByElement?: Record<string, string | undefined> }): Finding[] {
+  return findings.filter((finding) => {
+    if (!brief.focusStatuses.includes(finding.status)) return false;
+    if (brief.ruleIds.length && !brief.ruleIds.includes(finding.ruleId)) return false;
+    if (brief.selectedElementOnly && context?.selectedElementId !== finding.elementId) return false;
+    if (brief.storeys.length && !brief.storeys.includes(context?.storeyByElement?.[finding.elementId] ?? "")) return false;
+    return true;
+  }).slice(0, brief.maxFindings);
 }
 
 export function buildExternalInstruction(modelName: string, units: string, rules: string[], findings: Finding[], brief: ReportBrief): string {
-  return `MODEL: ${modelName}\nUNITS: ${units}\nAUDIENCE: ${brief.audience}\nLANGUAGE: ${brief.language}\nTONE: ${brief.tone}\nACTIVE RULES: ${rules.join("; ")}\n\nVERIFIED FINDINGS JSON:\n${JSON.stringify(findings, null, 2)}\n\nWrite only from the supplied findings. Do not invent identifiers, dimensions, verdicts or legal authority. REVIEW is uncertainty, not PASS. This package is for an external LLM chat; the built-in Report Agent does not require copying it.`;
+  return `MODEL: ${modelName}\nUNITS: ${units}\nAUDIENCE: ${brief.audience}\nLANGUAGE: ${brief.language}\nTONE: ${brief.tone}\nDETAIL: ${brief.detail}\nACTIVE RULES: ${rules.join("; ")}\n\nVERIFIED FINDINGS JSON:\n${JSON.stringify(findings, null, 2)}\n\nWrite only from the supplied findings. Discuss every supplied finding when DETAIL is per-finding. Do not invent identifiers, dimensions, verdicts or legal authority. REVIEW is uncertainty, not PASS. This package is for an external LLM chat; the built-in Report Agent does not require copying it.`;
 }
-

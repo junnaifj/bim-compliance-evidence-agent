@@ -108,6 +108,12 @@ test("system instructions treat documents as evidence, not executable instructio
   assert.match(AGENT_INSTRUCTIONS, /proposal/i);
 });
 
+test("Responses requests do not send the unsupported current_turn reasoning context", async () => {
+  const source = await fs.promises.readFile(new URL("../lib/openai-agent.server.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /context:\s*["']current_turn["']/);
+  assert.match(source, /reasoning:\s*\{\s*effort:\s*["']low["']\s*\}/);
+});
+
 test("Responses transport completes a strict tool loop without returning the API key", async () => {
   const calls = [];
   const fetchImpl = async (_url, init) => {

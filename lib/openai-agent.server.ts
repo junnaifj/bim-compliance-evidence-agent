@@ -64,7 +64,7 @@ export async function runOpenAIResponsesAgent(request: AgentRequest, options: Ru
     const body = {
       model: request.model, store: false, instructions: AGENT_INSTRUCTIONS, input,
       tools: agentToolDefinitions, tool_choice: "auto", parallel_tool_calls: false,
-      reasoning: { effort: "low", context: "current_turn" }, max_output_tokens: 1_600,
+      reasoning: { effort: "low" }, max_output_tokens: 1_600,
       text: { format: { type: "json_schema", name: "evidence_agent_response", strict: true, schema: agentResponseSchema }, verbosity: "medium" },
     };
     lastResponse = await callResponses(body, options.apiKey.trim(), fetchImpl, timeoutMs);

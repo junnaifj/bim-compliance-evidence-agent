@@ -16,10 +16,11 @@ The complete demonstration works without an API key:
 2. Orbit, pan and zoom the real IFC geometry; use X-ray and section controls.
 3. Run two deterministic checks. Move the pointer over the model to keep every reviewed element status-coloured while unreviewed shells become transparent grey. The picker indexes every streamed IFC product, searches the complete ray and prefers reviewed semantic elements. Repeated clicks at one point cycle through occluded elements. A selection isolates one GlobalId and filters its findings; click empty space or press Escape to clear.
 4. Propose a natural-language rule. The Agent checks feasibility and the active catalogue before asking whether to replace the existing rule, keep both with distinct scope, or cancel.
-5. Upload a PDF, DOCX, XLSX, CSV, IDS, IFC, DXF or text rule source. The document workspace reports extraction status, page and character evidence, previews the original, creates deterministic numerical drafts and lists non-executable requirement passages for optional conflict review.
+5. Upload a PDF, DOCX, XLSX, CSV, IDS, IFC, DXF or text rule source. The document workspace reports extraction status, page and character evidence, previews the original and keeps every extracted passage in one draft package. Edit each entry, mark it for execution, reference or exclusion, confirm it and finalise the complete package without needing a model.
 6. Select a finding and record a human disposition independently from the read-only machine verdict. Correct structured evidence only with a named reviewer, provenance and reason; inspect the before/after impact, confirm it explicitly, rerun the affected checks and undo it if necessary. The source IFC is never overwritten.
 7. Work with the Codex-style Evidence Agent in one continuous thread. Local deterministic mode needs no account. OpenAI mode uses either an operator-managed server secret or the user's session-only API key, with GPT-5.6 model selection, strict tools, grounded-output verification and a truthful local fallback. Every rule or evidence change remains a proposal until human confirmation.
-8. Tell the in-app Report Agent—in ordinary English or Chinese—who will read the report and what it should emphasise. Review its editable brief and generate without copying a prompt. Export is enabled only after identifiers, verdicts and numerical claims pass verification; human dispositions and applied evidence corrections are disclosed separately.
+8. Select the complete rule package for the model and run the review. Included rules remain visible in the execution log even when the IFC contains no applicable element. Switch packages to review the same model under a different source without silently merging catalogues.
+9. Click a finding to locate its GlobalId in 3D. Then tell the in-app Report Agent—in ordinary English or Chinese—who will read the report and what it should cover. Choose status, rule, storey, selected element, summary or per-finding detail, and English, Chinese or paired bilingual output. Generate locally or ask OpenAI for a verified professional narrative; no prompt copying is required.
 
 ## Deterministic rules
 
@@ -111,6 +112,7 @@ components/CodexAgentWorkspace.tsx Continuous Agent thread and composer controls
 lib/compliance.ts            IFC evidence, rules, conflicts, reports and guardrails
 lib/human-review.ts          Human review records, correction previews and effective model
 lib/document-intelligence.ts Rule-source parsing and official-source registry
+lib/rule-packages.ts         Human-confirmed, selectable whole-source packages
 lib/memory.ts                Device-local project and audit memory
 lib/agent.ts                 Provider registry and transparent orchestration trace
 lib/openai-agent.server.ts   Responses API tool loop and verified structured output

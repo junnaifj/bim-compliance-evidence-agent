@@ -20,3 +20,9 @@ It also keeps stricter semantics than the reference:
 - an LLM cannot activate rules, change deterministic verdicts or invent missing evidence.
 
 Reference: <https://github.com/WateryWaterman/-HKU-AI-Agent-Technical-Test-SFS_HKU/tree/960bcafa9870586634c0d3c85bcf1911c8b47e70/fsb-door-check/docs>
+
+The reporting workflow was also behaviourally reviewed against `Mickey12go/bim-compliance-checker`. The transferable principle is that deterministic findings own factual truth while an LLM turns those findings into a readable professional report, with a local fallback and a numerical-faithfulness check. Evidence Agent extends that division with selectable report scope, per-finding or summary detail, separate human-review disclosure and English, Chinese or paired bilingual output.
+
+The reference is MIT licensed, but this project still uses an independent implementation and imports no source, branding, templates or assets.
+
+Reference: <https://github.com/Mickey12go/bim-compliance-checker>

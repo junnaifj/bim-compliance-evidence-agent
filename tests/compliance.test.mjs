@@ -48,6 +48,11 @@ test("the verified report contains every finding and only grounded numerical cla
   assert.deepEqual(verifyReport(report, findings), { valid: true, issues: [] });
 });
 
+test("summary reports may omit finding identifiers while retaining grounded totals", () => {
+  const model = explicitDoorModel(850); const findings = analyseModel(model); const report = buildReport(model, findings, "en", undefined, "summary");
+  assert.doesNotMatch(report, new RegExp(model.doors[0].globalId)); assert.deepEqual(verifyReport(report, findings, { requireEveryFinding: false }), { valid: true, issues: [] });
+});
+
 test("the numerical guard catches a hallucinated threshold", () => {
   const model = explicitDoorModel(850); const findings = analyseModel(model); const report = buildReport(model, findings, "en").replaceAll("900 mm", "990 mm");
   const result = verifyReport(report, findings); assert.equal(result.valid, false); assert.match(result.issues.join(" "), /990/);

@@ -1,4 +1,4 @@
-# System Sequence Design and Test Method · SSD v1.6
+# System Sequence Design and Test Method · SSD v1.7
 
 ## Runtime SSD
 
@@ -18,14 +18,18 @@ sequenceDiagram
     V->>V: Parse geometry in the established viewer coordinates and place only the display grid at the model baseline
     U->>D: Upload authorised rule source
     D->>D: Bootstrap and verify the PDF worker
-    D-->>U: Original preview + extraction evidence + draft rule catalogue + anchors
+    D-->>U: Original preview + every extracted entry + anchors
+    U->>H: Edit each entry and choose include / reference / exclude
+    H->>R: Confirm the complete source package without requiring a model
+    R-->>O: Immutable, selectable READY package
     U->>R: Enter or select a proposed rule
     R->>R: Check units, plausibility, scope and active rules
     R-->>H: Replace / retain with scope / cancel
     H-->>R: Explicit decision
     R->>E: Versioned ACTIVE rule only
     U->>O: Run evidence review
-    O->>E: Normalised model evidence + active rules
+    O->>E: Normalised model evidence + selected package only
+    E-->>O: Per-rule execution record, including zero applicable elements
     E-->>V: Findings linked by GlobalId
     V->>V: Index storey containment without changing IFC placement coordinates
     U->>V: Enter, hover or select an IFC element
@@ -103,6 +107,11 @@ Every change runs, in order:
 45. Tool-authority tests allow evidence reads and proposal drafts only; no tool may activate a rule, mutate a finding or write a verdict.
 46. Live-Agent mutation tests reject invented GlobalIds, evidence paths, verdict changes and numerical claims before display. Failed verification produces an explicit local fallback and no state change.
 47. Data-minimisation tests prove that Agent requests contain bounded findings/rules and exclude IFC bytes, PDF text, API keys from the body, project memory and audit trace.
+48. Rule-package lifecycle tests retain every extracted entry, require an explicit decision for each entry and forbid activation while the package is `DRAFT`.
+49. Package-isolation tests prove that switching packages changes the selected rule set without merging source documents or leaking package rules into the project catalogue.
+50. Zero-applicability tests require every included rule to produce an execution record even where the selected IFC has no matching element.
+51. Report-scope tests cover status, rule, storey, selected GlobalId, human-review inclusion and summary/per-finding detail; changing scope invalidates a stale report.
+52. Bilingual Agent tests require paired native British English and Simplified Chinese sections and apply the same numerical, identifier and verdict guardrails to both.
 
 Deployment requires the complete `npm run quality` gate.
 
@@ -118,6 +127,8 @@ Deployment requires the complete `npm run quality` gate.
 - OCR or LLM-extracted passages remain untrusted draft evidence. They cannot alter deterministic findings, thresholds or active rules without human approval.
 - Unknown numerical claims and GlobalIds block report export.
 - Report chat cannot alter an active rule, override a verdict or disclose credentials.
+- Rule-source files are untrusted evidence. Every extracted passage remains draft until a human edits and confirms the complete package; the Agent cannot omit inconvenient clauses silently.
+- Package selection is explicit and exclusive for one review run. Results always record the package ID and version used.
 - Requests to change thresholds are handed to Rule Studio for conflict checking and human approval.
 - Long, HTML-bearing and prompt-injection inputs are treated as untrusted text.
 - Sample redistribution fails CI if source, licence, permission or hash is absent.
@@ -150,6 +161,7 @@ Mutation tests alter `900 mm` to `990 mm`, replace a GlobalId, remove expected e
 | Why this result | The selected-element inspector reproduces the finding's observation, requirement, deficit, evidence source, rule anchor, reliability and review note without recomputation or invented values. |
 | PDF worker | The configured worker is present in the production assets and is initialised before parsing; missing or blocked assets produce a visible technical error rather than a false “no rules” result. |
 | Rule source | CSV sample previews and yields an anchored draft. PDF upload exposes page/character/worker/hash evidence and a page-anchored catalogue of executable, structurable or reference-only passages. Technical failure, no text and no executable rule are different outcomes. No draft activates without a user choice. |
+| Rule package | Every extracted entry is reviewable before finalisation. A READY package can be selected independently of a model, never silently merges with another source and records included rules with no targets as `NO_APPLICABLE_ELEMENTS`. |
 | PDF retry | Selecting the same PDF again always starts a fresh read. A failed worker attempt cannot leave a stale empty catalogue or prevent retry. |
 | Deployment identity | The Sources view exposes a short build identifier and worker health result so an obsolete deployment can be distinguished from the tested repository revision. |
 | Human review | Each finding independently shows its immutable machine verdict and versioned human disposition. Reviewer, timestamp and note are visible and auditable. |
@@ -165,6 +177,7 @@ Mutation tests alter `900 mm` to `990 mm`, replace a GlobalId, remove expected e
 | IFC coordinates | IFC placements and XYZ geometry remain unchanged and the previous Y-up viewer convention is retained. Only the viewer grid is placed at the model minimum Y, so the model is not displayed below its visual baseline and evidence coordinates remain original. |
 | Bilingual | Navigation, workspaces, statuses, errors and report content change together |
 | Report | Export is enabled only when numerical and identifier verification succeeds |
+| Report scope | Users can select statuses, one rule, one storey, the selected element, summary/per-finding detail and human-review content before local or AI generation. |
 | Report Agent | Natural language becomes an editable brief; ordinary use requires no copied prompt; rule-change requests are routed to Rule Studio; deterministic local mode works without an API key |
 | Licence | Three published IFC files match the manifest hashes and declared redistribution terms |
 | Local official source | The manually downloaded HKSAR document retains its official URL and hash, remains Git-ignored and is never asserted to be redistributable |

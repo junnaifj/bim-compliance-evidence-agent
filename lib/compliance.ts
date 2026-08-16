@@ -262,17 +262,22 @@ function buildReportBase(model: BuildingModel, findings: Finding[], locale: Loca
   return `# ${zh ? "BIM 合规证据预审报告" : "BIM Compliance Evidence Pre-review"}\n\n**${zh ? "模型" : "Model"}:** ${model.name}  \n**Schema:** ${model.schema}  \n**${zh ? "单位" : "Units"}:** ${model.units}  \n**${zh ? "生成时间" : "Generated"}:** ${new Date().toISOString()}\n\n## ${zh ? "摘要" : "Summary"}\n\n${zh ? `完成 ${findings.length} 项检查：${counts.FAIL} 项不通过，${counts.REVIEW} 项需要人工复核，${counts.PASS} 项通过。` : `${findings.length} checks completed: ${counts.FAIL} failed, ${counts.REVIEW} require professional review and ${counts.PASS} passed.`}\n\n## ${zh ? "可追溯检查结果" : "Traceable findings"}\n\n${findings.map((item) => `### [${item.status}] ${item.elementName} — ${item.ruleTitle}\n\n${item.message}\n\n- GlobalId: \`${item.elementId}\`\n- ${zh ? "观测值" : "Observed"}: ${item.observed}\n- ${zh ? "要求" : "Required"}: ${item.required}\n- ${zh ? "证据" : "Evidence"}: \`${item.evidencePath}\`\n- ${zh ? "可靠性" : "Reliability"}: ${item.reliability}\n- ${zh ? "下一步" : "Next step"}: ${item.nextStep}`).join("\n\n")}\n\n---\n${zh ? "本工具仅支持专业预审，不构成法定认证，也不能替代合资格专业人士。" : "This tool supports professional pre-review. It does not certify statutory compliance or replace a suitably qualified professional."}\n`;
 }
 
-export function buildReport(model: BuildingModel, findings: Finding[], locale: Locale, human?: { reviews: { elementId:string; disposition:string }[]; overrides: { elementId:string; field:string; provenance:string; status:string }[] }): string {
-  const base = buildReportBase(model, findings, locale); if (!human) return base;
+function buildReportSummary(model: BuildingModel, findings: Finding[], locale: Locale): string {
+  const zh = locale === "zh"; const counts = Object.fromEntries(["FAIL", "REVIEW", "PASS", "NOT_APPLICABLE"].map((status) => [status, findings.filter((item) => item.status === status).length]));
+  return `# ${zh ? "BIM 合规证据预审摘要" : "BIM Compliance Evidence Pre-review Summary"}\n\n**${zh ? "模型" : "Model"}:** ${model.name}  \n**Schema:** ${model.schema}  \n**${zh ? "单位" : "Units"}:** ${model.units}\n\n## ${zh ? "检查结论" : "Review outcome"}\n\n${zh ? `选定范围共 ${findings.length} 项结果：${counts.FAIL} 项不通过，${counts.REVIEW} 项需复核，${counts.PASS} 项通过，${counts.NOT_APPLICABLE} 项不适用。` : `The selected scope contains ${findings.length} findings: ${counts.FAIL} failed, ${counts.REVIEW} require professional review, ${counts.PASS} passed and ${counts.NOT_APPLICABLE} are not applicable.`}\n\n---\n${zh ? "本摘要不代替逐项证据记录、法定认证或合资格专业人士判断。" : "This summary does not replace the finding-level evidence record, statutory certification or suitably qualified professional judgement."}\n`;
+}
+
+export function buildReport(model: BuildingModel, findings: Finding[], locale: Locale, human?: { reviews: { elementId:string; disposition:string }[]; overrides: { elementId:string; field:string; provenance:string; status:string }[] }, detail: "summary" | "per-finding" = "per-finding"): string {
+  const base = detail === "summary" ? buildReportSummary(model, findings, locale) : buildReportBase(model, findings, locale); if (!human || detail === "summary") return base;
   const lines = findings.flatMap((finding) => { const review = human.reviews.filter((record) => record.elementId === finding.elementId).at(-1); const corrections = human.overrides.filter((record) => record.elementId === finding.elementId && record.status === "APPLIED"); if (!review && !corrections.length) return []; return [`- ${finding.elementId}: ${review ? `${locale === "zh" ? "人工状态" : "human disposition"} ${review.disposition}` : ""}${review && corrections.length ? "; " : ""}${corrections.length ? `${locale === "zh" ? "有效证据修订" : "applied evidence correction"} ${corrections.map((record) => `${record.field} · ${record.provenance}`).join("; ")}` : ""}`]; });
   if (!lines.length) return base; const heading = locale === "zh" ? "## 人工复核与证据修订（不覆盖机器结论）" : "## Human review and evidence corrections (machine verdicts remain separate)"; return base.replace("\n---\n", `\n${heading}\n\n${lines.join("\n")}\n\n---\n`);
 }
 
-export function verifyReport(report: string, findings: Finding[]): { valid: boolean; issues: string[] } {
+export function verifyReport(report: string, findings: Finding[], options: { requireEveryFinding?: boolean } = {}): { valid: boolean; issues: string[] } {
   const issues: string[] = []; const requiredIds = findings.map((item) => item.elementId);
-  for (const id of requiredIds) if (!report.includes(id)) issues.push(`Missing GlobalId: ${id}`);
+  if (options.requireEveryFinding !== false) for (const id of requiredIds) if (!report.includes(id)) issues.push(`Missing GlobalId: ${id}`);
   const findingSections = report.split(/(?=^### \[)/gm);
-  for (const finding of findings) {
+  if (options.requireEveryFinding !== false) for (const finding of findings) {
     const section = findingSections.find((candidate) => candidate.includes(finding.elementId) && candidate.includes(finding.ruleTitle));
     if (section && !section.startsWith(`### [${finding.status}]`)) issues.push(`Verdict mismatch for ${finding.elementId}: expected ${finding.status}`);
   }

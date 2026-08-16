@@ -78,12 +78,13 @@ export function catalogueRequirementPassages(text: string): RequirementPassage[]
   for (const raw of text.split(/\n|(?<=[.;。；])\s+/)) {
     const page = raw.match(/^\[Page (\d+)\]\s*/i); if (page) currentPage = Number(page[1]);
     const item = raw.replace(/^\[Page \d+\]\s*/, "").replace(/\s+/g, " ").trim();
-    if (item.length < 30 || item.length > 800 || !/(shall|must|required|should|not less|minimum|须|应|必须|不得|至少)/i.test(item) || unsafeInstruction.test(item)) continue;
+    if (item.length < 30 || item.length > 800) continue;
+    if (unsafeInstruction.test(item)) { passages.push({ text: item, sourceAnchor: currentPage ? `Page ${currentPage}` : "Document text", classification: "REFERENCE_ONLY", missing: ["security review: instruction-like text cannot become executable"] }); continue; }
+    if (!/(shall|must|required|should|not less|minimum|须|应|必须|不得|至少)/i.test(item)) continue;
     const hasTarget = /(door|exit|egress|room|space|wall|beam|门|出口|疏散|房间|空间|墙|梁)/i.test(item);
     const hasMetric = /\d+(?:\.\d+)?\s*(?:mm|毫米|m|米)\b/i.test(item);
     const missing = [!hasTarget && "target element", !hasMetric && "measurable threshold"].filter(Boolean) as string[];
     passages.push({ text: item, sourceAnchor: currentPage ? `Page ${currentPage}` : "Document text", classification: hasTarget && hasMetric ? "EXECUTABLE" : hasTarget ? "STRUCTURABLE" : "REFERENCE_ONLY", missing });
-    if (passages.length === 20) break;
   }
   return passages;
 }
@@ -163,13 +164,12 @@ export async function readRuleDocument(file: File): Promise<RuleDocument> {
       const health = await verifyPdfWorker(); workerStatus = health.status;
       if (health.status === "FAILED") throw new Error(`[PDF_WORKER_UNAVAILABLE] ${health.url}: ${health.detail}`);
       const pdfjs = await loadPdfJs(); const pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise; pageCount = pdf.numPages;
-      const pages: string[] = []; const extractionLimit = Math.min(pdf.numPages, 25);
+      const pages: string[] = []; const extractionLimit = pdf.numPages;
       for (let pageNumber = 1; pageNumber <= extractionLimit; pageNumber += 1) {
         const content = await (await pdf.getPage(pageNumber)).getTextContent();
         pages.push(`[Page ${pageNumber}]\n${content.items.map((item: { str?: string }) => item.str ?? "").join(" ")}`);
       }
       extractedText = pages.join("\n\n");
-      if (pdf.numPages > extractionLimit) warnings.push(`Text extraction was bounded to the first ${extractionLimit} of ${pdf.numPages} pages for responsive in-browser review. The complete original remains available in the preview.`);
     } catch (error) {
       extractionFailed = true; const detail = error instanceof Error ? error.message : "Unknown PDF extraction error";
       warnings.push(`PDF text extraction failed [PDF_EXTRACTION_ERROR]: ${detail}. The original remains available in the private preview; use an authorised OCR copy if the document is scanned or copy-restricted.`);
