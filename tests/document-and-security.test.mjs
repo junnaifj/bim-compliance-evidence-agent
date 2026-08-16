@@ -57,5 +57,6 @@ test("assessment samples remain operable at narrow responsive widths", async () 
   assert.match(page, /aria-pressed=\{model\.id === sample\.id\}/);
   assert.match(page, /loadingSampleId === sample\.id/);
   assert.doesNotMatch(page, /requestAnimationFrame\(\(\) => resolve\(\)\)/);
+  assert.doesNotMatch(page, /new Promise<void>\(\(resolve\) => setTimeout/);
   assert.match(css, /@media\(max-width:820px\)[\s\S]*?\.rail \.sample \{ display:flex/);
 });

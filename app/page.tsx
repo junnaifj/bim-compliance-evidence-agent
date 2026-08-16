@@ -695,7 +695,6 @@ export default function Home() {
     try {
       if (!initial) {
         setLoadingSampleId(sample.id);
-        await new Promise<void>((resolve) => setTimeout(resolve, 0));
       }
       const response = await fetch(sample.path);
       if (!response.ok) {
