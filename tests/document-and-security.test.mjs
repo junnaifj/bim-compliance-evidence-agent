@@ -50,3 +50,11 @@ test("Chinese mode has complete working labels and the removed benchmark is abse
   for (const label of ["上传 IFC 模型", "证据地图", "规则来源库", "透明 Agent 工作空间", "已验证审查报告"]) assert.match(source, new RegExp(label));
   assert.doesNotMatch(source, /Candidate benchmarks|candidateModels|loadCandidate/);
 });
+
+test("assessment samples remain operable at narrow responsive widths", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(page, /aria-pressed=\{model\.id === sample\.id\}/);
+  assert.match(page, /loadingSampleId === sample\.id/);
+  assert.match(css, /@media\(max-width:820px\)[\s\S]*?\.rail \.sample \{ display:flex/);
+});

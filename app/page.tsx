@@ -305,7 +305,7 @@ const blankModel: BuildingModel = {
   doors: [],
   spaces: [],
 };
-const BUILD_ID = "EA-0.3.0 · SSD-1.7";
+const BUILD_ID = "EA-0.3.1 · SSD-1.7";
 const zhRuleText = "已确认的疏散门净宽不得小于 0.95 米";
 const localiseRuleText = (value: string) =>
   ({
@@ -363,6 +363,7 @@ export default function Home() {
     null,
   );
   const [busy, setBusy] = useState(false);
+  const [loadingSampleId, setLoadingSampleId] = useState<string>();
   const [toast, setToast] = useState("");
   const [reviewStatus, setReviewStatus] = useState<"ALL" | Finding["status"]>(
     "ALL",
@@ -690,8 +691,18 @@ export default function Home() {
     sample: (typeof assessmentSamples)[number],
     initial = false,
   ) {
+    if (loadingSampleId && !initial) return;
     try {
+      if (!initial) {
+        setLoadingSampleId(sample.id);
+        await new Promise<void>((resolve) =>
+          requestAnimationFrame(() => resolve()),
+        );
+      }
       const response = await fetch(sample.path);
+      if (!response.ok) {
+        throw new Error(`Sample download failed (HTTP ${response.status}).`);
+      }
       const buffer = await response.arrayBuffer();
       const parsed = parseIfc(
         new TextDecoder().decode(buffer),
@@ -722,6 +733,8 @@ export default function Home() {
       flash(
         error instanceof Error ? error.message : "Sample could not be loaded.",
       );
+    } finally {
+      if (!initial) setLoadingSampleId(undefined);
     }
   }
 
@@ -1237,14 +1250,23 @@ export default function Home() {
             </div>
             {assessmentSamples.map((sample) => (
               <button
-                className={`sample ${model.id === sample.id ? "current" : ""}`}
+                className={`sample ${model.id === sample.id ? "current" : ""} ${loadingSampleId === sample.id ? "sample-loading" : ""}`}
                 key={sample.id}
                 onClick={() => void loadSample(sample)}
+                disabled={Boolean(loadingSampleId)}
+                aria-pressed={model.id === sample.id}
+                aria-busy={loadingSampleId === sample.id}
               >
                 <span className="file-icon">IFC</span>
                 <span>
                   <strong>{sample.label[locale]}</strong>
-                  <small>{sample.note[locale]}</small>
+                  <small>
+                    {loadingSampleId === sample.id
+                      ? locale === "zh"
+                        ? "正在载入并解析模型…"
+                        : "Loading and parsing model…"
+                      : sample.note[locale]}
+                  </small>
                   <small>
                     {sample.schema} · {sample.licence}
                   </small>
