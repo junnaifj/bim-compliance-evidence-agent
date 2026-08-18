@@ -1,4 +1,4 @@
-# System Sequence Design and Test Method · SSD v1.7
+# System Sequence Design and Test Method · SSD v1.8
 
 ## Runtime SSD
 
@@ -14,6 +14,10 @@ sequenceDiagram
     participant E as Deterministic engine
     participant X as Evidence verifier
 
+    U->>O: Open the hosted application
+    O-->>U: Require platform-managed sign-in when identity is absent
+    U->>O: Return with a verified ChatGPT identity
+    O-->>U: Render the private workspace; never store provider credentials
     U->>V: Select sample or upload IFC
     V->>V: Parse geometry in the established viewer coordinates and place only the display grid at the model baseline
     U->>D: Upload authorised rule source
@@ -112,6 +116,11 @@ Every change runs, in order:
 50. Zero-applicability tests require every included rule to produce an execution record even where the selected IFC has no matching element.
 51. Report-scope tests cover status, rule, storey, selected GlobalId, human-review inclusion and summary/per-finding detail; changing scope invalidates a stale report.
 52. Bilingual Agent tests require paired native British English and Simplified Chinese sections and apply the same numerical, identifier and verdict guardrails to both.
+53. Identity-gate tests require an anonymous page request to redirect to the platform sign-in path and an authenticated request to server-render the workspace.
+54. Agent API identity tests reject missing platform identity before request parsing or upstream execution.
+55. Sign-out and return-path tests permit same-origin relative paths only and reject protocol-relative, external and reserved authentication paths.
+56. Language-purity tests generate findings independently for each report locale, preserve identical machine codes and values, and reject leaked English prose in Chinese output or Chinese prose in English output.
+57. Professional-report tests require project particulars, an executive conclusion, complete counts, finding-level conclusions, acceptance criteria, evidence quality, recommended actions and a limitation statement.
 
 Deployment requires the complete `npm run quality` gate.
 
@@ -176,6 +185,7 @@ Mutation tests alter `900 mm` to `990 mm`, replace a GlobalId, remove expected e
 | Human-aware report | Reports separately disclose machine verdict, original/effective evidence, override provenance and human disposition; human acceptance never becomes machine PASS. |
 | IFC coordinates | IFC placements and XYZ geometry remain unchanged and the previous Y-up viewer convention is retained. Only the viewer grid is placed at the model minimum Y, so the model is not displayed below its visual baseline and evidence coordinates remain original. |
 | Bilingual | Navigation, workspaces, statuses, errors and report content change together |
+| Identity | Anonymous users are redirected before project rendering; authenticated users see only their own identity and may sign out. Provider credentials and identity are absent from reports, project memory and Agent payloads. |
 | Report | Export is enabled only when numerical and identifier verification succeeds |
 | Report scope | Users can select statuses, one rule, one storey, the selected element, summary/per-finding detail and human-review content before local or AI generation. |
 | Report Agent | Natural language becomes an editable brief; ordinary use requires no copied prompt; rule-change requests are routed to Rule Studio; deterministic local mode works without an API key |

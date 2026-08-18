@@ -6,6 +6,8 @@
 
 Evidence Agent is an evidence-first BIM compliance workspace for IFC pre-review. It combines a real browser-based IFC viewer, deterministic compliance rules, document-to-rule extraction, human approval, project memory, revision comparison and numerically guarded bilingual reports.
 
+The hosted application requires **Sign in with ChatGPT** before any project interface or Agent endpoint is available. Each visitor uses their own ChatGPT identity and may authenticate through the Google, Microsoft, Apple or email method supported by their ChatGPT account. Evidence Agent does not receive or store those provider passwords.
+
 > The application supports professional pre-review. It does not certify statutory compliance or replace approved plans or a suitably qualified professional.
 
 ## Assessment path
@@ -52,6 +54,8 @@ The Hong Kong Buildings Department and Development Bureau entries are official l
 Extracted clauses remain `DRAFT`. A source page, sheet or text segment is retained, and a user must approve any activation.
 
 ## Agent architecture
+
+![Evidence Agent architecture](public/architecture-overview.png)
 
 - Review Orchestrator — bounded plan and hand-offs.
 - Model Intake — schema, units, entity and GlobalId evidence.
@@ -105,25 +109,26 @@ It repeats the production quality gate, rejects tracked quarantine or obsolete s
 ## Repository map
 
 ```text
-app/                         Bilingual product interface
-components/IfcViewer.tsx     Real web-ifc + Three.js evidence viewer
-components/HumanReviewPanel.tsx Human disposition, evidence correction and undo workflow
-components/CodexAgentWorkspace.tsx Continuous Agent thread and composer controls
-lib/compliance.ts            IFC evidence, rules, conflicts, reports and guardrails
-lib/human-review.ts          Human review records, correction previews and effective model
-lib/document-intelligence.ts Rule-source parsing and official-source registry
-lib/rule-packages.ts         Human-confirmed, selectable whole-source packages
-lib/memory.ts                Device-local project and audit memory
-lib/agent.ts                 Provider registry and transparent orchestration trace
-lib/openai-agent.server.ts   Responses API tool loop and verified structured output
-lib/agent-gateway.ts         Explicit operator/BYOK credentials and rate limits
-app/api/agent/               Same-origin, no-store server API routes
-lib/report-agent.ts          Natural-language report brief, routing and safeguards
-lib/viewer-interaction.ts    Hover/selection state and GlobalId finding filters
-public/samples/               Licensed real IFC assessment models
-prompts/                      Public Agent contracts
-tests/                        Boundary, sample, security, licence and hallucination tests
-docs/                         Architecture, SSD and assessment evidence
+bim-audit-copilot/
+├── app/
+│   ├── api/agent/           Authenticated, same-origin OpenAI gateway
+│   ├── chatgpt-auth.ts      Platform identity and safe sign-in/out paths
+│   ├── globals.css          Product design system
+│   ├── layout.tsx           Accessible document metadata
+│   └── page.tsx             Thin server-side identity gate
+├── components/
+│   ├── EvidenceAgentApp.tsx Complete bilingual workspace
+│   ├── IfcViewer.tsx        web-ifc + Three.js evidence map
+│   ├── HumanReviewPanel.tsx Human disposition, corrections and history
+│   └── CodexAgentWorkspace.tsx Agent thread, model and credential controls
+├── lib/                     Rules, reports, packages, memory and safeguards
+├── public/                  Licensed samples, IFC runtime and architecture image
+├── manual-test-files/       Upload fixtures; restricted PDFs remain ignored
+├── prompts/                 Public Agent contracts
+├── tests/                   SSD, security, licence and hallucination gates
+├── docs/                    Architecture, deployment and assessment evidence
+├── scripts/preupload.sh     Repository release gate
+└── .openai/hosting.json     Sites deployment metadata
 ```
 
 ## Licence

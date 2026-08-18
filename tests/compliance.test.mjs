@@ -48,6 +48,20 @@ test("the verified report contains every finding and only grounded numerical cla
   assert.deepEqual(verifyReport(report, findings), { valid: true, issues: [] });
 });
 
+test("English and Chinese reports use natural professional language without leaking UI-locale prose", () => {
+  const model = explicitDoorModel(850);
+  const englishFindings = analyseModel(model, builtinRules, "en");
+  const chineseFindings = analyseModel(model, builtinRules, "zh");
+  const english = buildReport(model, englishFindings, "en");
+  const chinese = buildReport(model, chineseFindings, "zh");
+  assert.match(english, /Executive summary/); assert.match(english, /Professional review required|Fail|Pass/);
+  assert.doesNotMatch(english, /需专业复核|毫米|证据质量/);
+  assert.match(chinese, /执行摘要/); assert.match(chinese, /需专业复核|不通过|通过/);
+  assert.doesNotMatch(chinese, /Reliability:|Schema:|No usable width property|nominal proxy/);
+  assert.deepEqual(verifyReport(english, englishFindings), { valid: true, issues: [] });
+  assert.deepEqual(verifyReport(chinese, chineseFindings), { valid: true, issues: [] });
+});
+
 test("summary reports may omit finding identifiers while retaining grounded totals", () => {
   const model = explicitDoorModel(850); const findings = analyseModel(model); const report = buildReport(model, findings, "en", undefined, "summary");
   assert.doesNotMatch(report, new RegExp(model.doors[0].globalId)); assert.deepEqual(verifyReport(report, findings, { requireEveryFinding: false }), { valid: true, issues: [] });
@@ -64,7 +78,7 @@ test("the identifier guard catches an invented GlobalId", () => {
 });
 
 test("the verdict guard catches a REVIEW-to-PASS hallucination", () => {
-  const model = explicitDoorModel(850); model.doors[0].widthSource = "overall_width_proxy"; const findings = analyseModel(model); const report = buildReport(model, findings, "en").replace("### [REVIEW]", "### [PASS]");
+  const model = explicitDoorModel(850); model.doors[0].widthSource = "overall_width_proxy"; const findings = analyseModel(model); const report = buildReport(model, findings, "en").replace("`REVIEW`", "`PASS`");
   const result = verifyReport(report, findings); assert.equal(result.valid, false); assert.match(result.issues.join(" "), /Verdict mismatch/);
 });
 

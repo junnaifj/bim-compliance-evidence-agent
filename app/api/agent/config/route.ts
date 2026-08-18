@@ -1,17 +1,20 @@
 import { allowedOpenAIModels, apiKeyLooksValid, assertSameOrigin } from "../../../../lib/agent-contract.ts";
 import { resolveAgentCredential } from "../../../../lib/agent-gateway.ts";
 import { AgentGatewayError, probeOpenAIKey } from "../../../../lib/openai-agent.server.ts";
+import { authenticatedUserFromHeaders } from "../../../../lib/authenticated-user.ts";
 
 export const runtime = "edge";
 const defaultModel = () => allowedOpenAIModels.includes(process.env.OPENAI_MODEL?.trim() as (typeof allowedOpenAIModels)[number]) ? process.env.OPENAI_MODEL!.trim() : "gpt-5.6";
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { "cache-control": "no-store" } });
 
-export function GET(): Response {
+export function GET(request: Request): Response {
+  if (!authenticatedUserFromHeaders(request.headers)) return json({ ok: false, error: { code: "AUTH_REQUIRED", message: "Sign in before using the Agent." } }, 401);
   return json({ ok: true, provider: "openai", serverConfigured: apiKeyLooksValid(process.env.OPENAI_API_KEY ?? ""), defaultModel: defaultModel(), models: allowedOpenAIModels, byokSupported: true, keyStorage: "session-memory-only" });
 }
 
 export async function POST(request: Request): Promise<Response> {
   try {
+    if (!authenticatedUserFromHeaders(request.headers)) return json({ ok: false, error: { code: "AUTH_REQUIRED", message: "Sign in before using the Agent." } }, 401);
     assertSameOrigin(request.url, request.headers.get("origin"));
     const body = await request.json() as { model?: unknown };
     const model = typeof body.model === "string" ? body.model : defaultModel();

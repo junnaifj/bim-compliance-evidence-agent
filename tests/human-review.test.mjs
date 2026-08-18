@@ -39,6 +39,6 @@ test("agent language becomes a proposal and cannot target an absent element", ()
 test("verified reports disclose human disposition and applied correction separately", () => {
   const impact = previewOverride(model, [], validDraft, builtinRules, "en"); const applied = confirmOverride([], impact); const findings = impact.after;
   const report = buildReport(effectiveModel(model, applied), findings, "en", { reviews:[{ elementId:model.doors[0].globalId, disposition:"CONFIRMED" }], overrides:applied });
-  assert.match(report, /Human review and evidence corrections/); assert.match(report, /human disposition CONFIRMED/); assert.match(report, /clearWidth · FIELD_MEASUREMENT/);
+  assert.match(report, /Human review and evidence corrections/); assert.match(report, /Human disposition `CONFIRMED`/); assert.match(report, /clearWidth · FIELD_MEASUREMENT/);
   assert.equal(verifyReport(report, findings).valid, true);
 });

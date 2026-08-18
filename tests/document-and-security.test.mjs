@@ -37,7 +37,7 @@ test("the production PDF worker is shipped and configured before document parsin
 });
 
 test("the rule-source input is reset so the same file can be retried", async () => {
-  const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const source = await readFile(new URL("../components/EvidenceAgentApp.tsx", import.meta.url), "utf8");
   assert.match(source, /event\.currentTarget\.value = ""/); assert.match(source, /PDF worker/); assert.match(source, /BUILD_ID/);
 });
 
@@ -46,13 +46,13 @@ test("official Hong Kong files are link-only and not marked for redistribution",
 });
 
 test("Chinese mode has complete working labels and the removed benchmark is absent", async () => {
-  const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const source = await readFile(new URL("../components/EvidenceAgentApp.tsx", import.meta.url), "utf8");
   for (const label of ["上传 IFC 模型", "证据地图", "规则来源库", "透明 Agent 工作空间", "已验证审查报告"]) assert.match(source, new RegExp(label));
   assert.doesNotMatch(source, /Candidate benchmarks|candidateModels|loadCandidate/);
 });
 
 test("assessment samples remain operable at narrow responsive widths", async () => {
-  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const page = await readFile(new URL("../components/EvidenceAgentApp.tsx", import.meta.url), "utf8");
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   assert.match(page, /aria-pressed=\{model\.id === sample\.id\}/);
   assert.match(page, /loadingSampleId === sample\.id/);

@@ -164,9 +164,16 @@ test("agent routes enforce actual body size, same origin and no-store responses"
 
 test("agent route rejects invalid BYOK and oversized bodies without contacting OpenAI", async () => {
   const { POST } = await import("../app/api/agent/route.ts");
-  const invalidKey = await POST(new Request("https://assessment.example/api/agent", { method: "POST", headers: { origin: "https://assessment.example", "content-type": "application/json", "x-evidence-agent-auth": "byok", "x-evidence-openai-key": "not-a-key", "x-forwarded-for": `invalid-key-${Date.now()}` }, body: JSON.stringify(request) }));
+  const invalidKey = await POST(new Request("https://assessment.example/api/agent", { method: "POST", headers: { origin: "https://assessment.example", "content-type": "application/json", "oai-authenticated-user-email": "reviewer@example.com", "x-evidence-agent-auth": "byok", "x-evidence-openai-key": "not-a-key", "x-forwarded-for": `invalid-key-${Date.now()}` }, body: JSON.stringify(request) }));
   assert.equal(invalidKey.status, 401);
   assert.doesNotMatch(await invalidKey.text(), /authorization|Bearer/i);
-  const oversized = await POST(new Request("https://assessment.example/api/agent", { method: "POST", headers: { origin: "https://assessment.example", "x-forwarded-for": `oversized-${Date.now()}` }, body: "x".repeat(1_000_001) }));
+  const oversized = await POST(new Request("https://assessment.example/api/agent", { method: "POST", headers: { origin: "https://assessment.example", "oai-authenticated-user-email": "reviewer@example.com", "x-forwarded-for": `oversized-${Date.now()}` }, body: "x".repeat(1_000_001) }));
   assert.equal(oversized.status, 413);
+});
+
+test("agent route rejects anonymous requests before processing model context", async () => {
+  const { POST } = await import("../app/api/agent/route.ts");
+  const response = await POST(new Request("https://assessment.example/api/agent", { method: "POST", headers: { origin: "https://assessment.example" }, body: JSON.stringify(request) }));
+  assert.equal(response.status, 401);
+  assert.match(await response.text(), /AUTH_REQUIRED/);
 });
