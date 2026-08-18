@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import type { Finding, Locale, RuleDefinition } from "../lib/compliance";
-import { classifyAgentRequest, providers, selectableAgentModels, type AgentProvider, type AgentRole } from "../lib/agent";
-import type { AgentEnvelope, AgentTraceEntry } from "../lib/agent-contract";
-import { interpretEvidenceChange, type OverrideDraft } from "../lib/human-review";
+import type { Finding, Locale, RuleDefinition } from "../core/compliance/compliance";
+import { classifyAgentRequest, providers, selectableAgentModels, type AgentProvider, type AgentRole } from "../core/agent/agent";
+import type { AgentEnvelope, AgentTraceEntry } from "../core/agent/agent-contract";
+import { interpretEvidenceChange, type OverrideDraft } from "../core/review/human-review";
 
 type Message = { role: "user" | "agent"; text: string; meta?: string };
 let transientSessionKey = "";

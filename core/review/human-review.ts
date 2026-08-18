@@ -1,4 +1,4 @@
-import { analyseModel, type BuildingModel, type Finding, type Locale, type RuleDefinition } from "./compliance.ts";
+import { analyseModel, type BuildingModel, type Finding, type Locale, type RuleDefinition } from "../compliance/compliance.ts";
 
 export type ReviewDisposition = "UNREVIEWED" | "CONFIRMED" | "ACTION_REQUIRED" | "ACCEPTED_WITH_NOTE" | "NEEDS_FOLLOW_UP" | "MANUALLY_EXCLUDED";
 export type OverrideField = "clearWidth" | "exitApplicability" | "fireRating" | "name";

@@ -1,7 +1,7 @@
-import { allowedOpenAIModels, apiKeyLooksValid, assertSameOrigin } from "../../../../lib/agent-contract.ts";
-import { resolveAgentCredential } from "../../../../lib/agent-gateway.ts";
-import { AgentGatewayError, probeOpenAIKey } from "../../../../lib/openai-agent.server.ts";
-import { authenticatedUserFromHeaders } from "../../../../lib/authenticated-user.ts";
+import { allowedOpenAIModels, apiKeyLooksValid, assertSameOrigin } from "../../../../core/agent/agent-contract.ts";
+import { resolveAgentCredential } from "../../../../core/agent/agent-gateway.ts";
+import { AgentGatewayError, probeOpenAIKey } from "../../../../core/agent/openai-agent.server.ts";
+import { authenticatedUserFromHeaders } from "../../../../core/review/authenticated-user.ts";
 
 export const runtime = "edge";
 const defaultModel = () => allowedOpenAIModels.includes(process.env.OPENAI_MODEL?.trim() as (typeof allowedOpenAIModels)[number]) ? process.env.OPENAI_MODEL!.trim() : "gpt-5.6";

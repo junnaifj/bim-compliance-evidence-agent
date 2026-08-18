@@ -1,4 +1,4 @@
-import { audit, type AuditEvent } from "./memory.ts";
+import { audit, type AuditEvent } from "../review/memory.ts";
 
 export type AgentAvailability = "ready" | "credential-required" | "planned";
 export type AgentProvider = { id: "local" | "openai" | "anthropic" | "google" | "openrouter"; name: string; mode: AgentAvailability; privacy: { en: string; zh: string }; suitableFor: { en: string; zh: string } };

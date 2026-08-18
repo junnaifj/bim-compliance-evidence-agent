@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { builtinRulePackage, createRulePackageDraft, executionRecords, finaliseRulePackage, rulePackageReadiness, rulesForPackage, updateRulePackageEntry } from "../lib/rule-packages.ts";
+import { builtinRulePackage, createRulePackageDraft, executionRecords, finaliseRulePackage, rulePackageReadiness, rulesForPackage, updateRulePackageEntry } from "../core/rules/rule-packages.ts";
 
 const document = {
   id: "doc-abc", name: "requirements.pdf", mime: "application/pdf", size: 42, hash: "abcdef0123456789", source: "uploaded", licence: "User-supplied", warnings: [], extractedText: "", rules: [{

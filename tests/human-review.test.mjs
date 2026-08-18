@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildReport, builtinRules, verifyReport } from "../lib/compliance.ts";
-import { confirmOverride, currentReview, effectiveModel, interpretEvidenceChange, previewOverride, revertLatestOverride, saveReview, validateOverride } from "../lib/human-review.ts";
+import { buildReport, builtinRules, verifyReport } from "../core/compliance/compliance.ts";
+import { confirmOverride, currentReview, effectiveModel, interpretEvidenceChange, previewOverride, revertLatestOverride, saveReview, validateOverride } from "../core/review/human-review.ts";
 
 const model = { id:"m", name:"Review fixture", filename:"m.ifc", schema:"IFC4", units:"mm", storeys:1, source:"uploaded", spaces:[], doors:[{ expressId:1, globalId:"DOOR-GLOBAL-ID-00000001", name:"D1", widthMm:800, widthSource:"overall_width_proxy", isExit:true }] };
 const validDraft = { elementId:model.doors[0].globalId, field:"clearWidth", value:930, provenance:"FIELD_MEASUREMENT", reason:"Site measurement sheet M-12", reviewer:"A. Reviewer" };

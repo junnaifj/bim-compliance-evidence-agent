@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { agentModels, classifyAgentRequest, selectableAgentModels } from "../lib/agent.ts";
+import { agentModels, classifyAgentRequest, selectableAgentModels } from "../core/agent/agent.ts";
 
 test("local remains ready, OpenAI supports credentials, and unimplemented connectors stay unavailable", () => {
   assert.deepEqual(selectableAgentModels("local").map((item) => item.id), ["evidence-local-v1"]);

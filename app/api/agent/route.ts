@@ -1,7 +1,7 @@
-import { assertSameOrigin, validateAgentRequest } from "../../../lib/agent-contract.ts";
-import { clientIdentifier, consumeAgentRateLimit, resolveAgentCredential } from "../../../lib/agent-gateway.ts";
-import { AgentGatewayError, runOpenAIResponsesAgent } from "../../../lib/openai-agent.server.ts";
-import { authenticatedUserFromHeaders } from "../../../lib/authenticated-user.ts";
+import { assertSameOrigin, validateAgentRequest } from "../../../core/agent/agent-contract.ts";
+import { clientIdentifier, consumeAgentRateLimit, resolveAgentCredential } from "../../../core/agent/agent-gateway.ts";
+import { AgentGatewayError, runOpenAIResponsesAgent } from "../../../core/agent/openai-agent.server.ts";
+import { authenticatedUserFromHeaders } from "../../../core/review/authenticated-user.ts";
 
 export const runtime = "edge";
 const json = (body: unknown, status = 200, extraHeaders?: HeadersInit) => Response.json(body, { status, headers: { "cache-control": "no-store", ...extraHeaders } });

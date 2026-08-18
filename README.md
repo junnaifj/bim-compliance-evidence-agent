@@ -22,7 +22,7 @@ The complete demonstration works without an API key:
 6. Select a finding and record a human disposition independently from the read-only machine verdict. Correct structured evidence only with a named reviewer, provenance and reason; inspect the before/after impact, confirm it explicitly, rerun the affected checks and undo it if necessary. The source IFC is never overwritten.
 7. Work with the Codex-style Evidence Agent in one continuous thread. Local deterministic mode needs no account. OpenAI mode uses either an operator-managed server secret or the user's session-only API key, with GPT-5.6 model selection, strict tools, grounded-output verification and a truthful local fallback. Every rule or evidence change remains a proposal until human confirmation.
 8. Select the complete rule package for the model and run the review. Included rules remain visible in the execution log even when the IFC contains no applicable element. Switch packages to review the same model under a different source without silently merging catalogues.
-9. Click a finding to locate its GlobalId in 3D. Then tell the in-app Report Agent—in ordinary English or Chinese—who will read the report and what it should cover. Choose status, rule, storey, selected element, summary or per-finding detail, and English, Chinese or paired bilingual output. Generate locally or ask OpenAI for a verified professional narrative; no prompt copying is required.
+9. Click a finding to locate its GlobalId in 3D. Then tell the in-app Report Agent—in ordinary English or Chinese—who will read the report and what it should cover. Choose status, rule, storey, selected element, summary or per-finding detail, and English, Chinese or paired bilingual output. Generate locally or ask OpenAI for a verified professional narrative; no prompt copying is required. Export the same verified record as Markdown, structured JSON or print/save-to-PDF.
 
 ## Deterministic rules
 
@@ -32,6 +32,8 @@ The complete demonstration works without an API key:
 | `INFO-001` | Checks door name, applicability, width provenance and fire-rating evidence for confirmed exits. Missing information is `REVIEW`, never an invented failure or pass. |
 
 LLMs may explain, extract and suggest. They never own `PASS`, `FAIL`, `REVIEW` or `NOT_APPLICABLE`.
+
+Reports separate confirmed `FAIL` findings from uncertain `REVIEW` matters. Deterministic P1/P2/P3 priorities combine the machine status with the approved rule severity; an LLM may explain those priorities but cannot create or alter them.
 
 ## Real assessment samples
 
@@ -45,7 +47,7 @@ See [`public/samples/manifest.json`](public/samples/manifest.json) for exact sou
 
 ## Manual upload fixtures
 
-[`manual-test-files/`](manual-test-files/) contains a concise Apache-2.0 `IfcOpenHouse.ifc` fixture and attribution for manual model-upload testing. A Buildings Department BIM statutory-submission PDF can also be downloaded into the Git-ignored `manual-test-files/hk-official/` folder for private preview testing. Its official URL, local hash and non-redistribution treatment are recorded in the manual-fixture manifest.
+[`fixtures/`](fixtures/) contains a concise Apache-2.0 `IfcOpenHouse.ifc` fixture and attribution for manual model-upload testing. A Buildings Department BIM statutory-submission PDF can also be downloaded into the Git-ignored `fixtures/hk-official/` folder for private preview testing. Its official URL, local hash and non-redistribution treatment are recorded in the fixture manifest.
 
 ## Rule sources and copyright
 
@@ -121,9 +123,14 @@ bim-audit-copilot/
 │   ├── IfcViewer.tsx        web-ifc + Three.js evidence map
 │   ├── HumanReviewPanel.tsx Human disposition, corrections and history
 │   └── CodexAgentWorkspace.tsx Agent thread, model and credential controls
-├── lib/                     Rules, reports, packages, memory and safeguards
+├── core/
+│   ├── compliance/          IFC parsing, deterministic checks and viewer state
+│   ├── agent/               LLM gateway, tools, schemas and verification
+│   ├── reports/             Report brief and grounded report orchestration
+│   ├── rules/               Source extraction and selectable rule packages
+│   └── review/              Human review, identity and project memory
 ├── public/                  Licensed samples, IFC runtime and architecture image
-├── manual-test-files/       Upload fixtures; restricted PDFs remain ignored
+├── fixtures/                Upload fixtures; restricted PDFs remain ignored
 ├── prompts/                 Public Agent contracts
 ├── tests/                   SSD, security, licence and hallucination gates
 ├── docs/                    Architecture, deployment and assessment evidence

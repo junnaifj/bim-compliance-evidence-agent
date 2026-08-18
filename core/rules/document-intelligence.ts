@@ -1,4 +1,4 @@
-import type { RuleDefinition } from "./compliance";
+import type { RuleDefinition } from "../compliance/compliance";
 
 export type RuleDocument = {
   id: string;

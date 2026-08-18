@@ -16,12 +16,12 @@ import {
   type Finding,
   type Locale,
   type RuleDefinition,
-} from "../lib/compliance";
+} from "../core/compliance/compliance";
 import {
   officialRuleSources,
   readRuleDocument,
   type RuleDocument,
-} from "../lib/document-intelligence";
+} from "../core/rules/document-intelligence";
 import {
   audit,
   clearMemory,
@@ -30,15 +30,15 @@ import {
   saveMemory,
   type AuditEvent,
   type ProjectMemory,
-} from "../lib/memory";
-import { reviewTrace, type AgentProvider } from "../lib/agent";
+} from "../core/review/memory";
+import { reviewTrace, type AgentProvider } from "../core/agent/agent";
 import {
   buildExternalInstruction,
   defaultReportBrief,
   findingsForBrief,
   interpretReportRequest,
   type ReportBrief,
-} from "../lib/report-agent";
+} from "../core/reports/report-agent";
 import {
   builtinRulePackage,
   createRulePackageDraft,
@@ -49,19 +49,19 @@ import {
   updateRulePackageEntry,
   type RulePackage,
   type RulePackageDecision,
-} from "../lib/rule-packages";
+} from "../core/rules/rule-packages";
 import {
   filterFindingsForSelection,
   nextFindingByStatus,
   shouldHandleReviewShortcut,
   type ViewerElement,
-} from "../lib/viewer-interaction";
+} from "../core/compliance/viewer-interaction";
 import {
   effectiveModel,
   type ElementEvidenceOverride,
   type HumanReviewRecord,
   type OverrideDraft,
-} from "../lib/human-review";
+} from "../core/review/human-review";
 import HumanReviewPanel from "./HumanReviewPanel";
 import CodexAgentWorkspace from "./CodexAgentWorkspace";
 
@@ -305,7 +305,7 @@ const blankModel: BuildingModel = {
   doors: [],
   spaces: [],
 };
-const BUILD_ID = "EA-0.4.0 · SSD-1.8";
+const BUILD_ID = "EA-0.5.0 · SSD-1.9";
 const zhRuleText = "已确认的疏散门净宽不得小于 0.95 米";
 const localiseRuleText = (value: string) =>
   ({
@@ -417,6 +417,7 @@ export default function EvidenceAgentApp({ viewer }: { viewer: { displayName: st
   );
   const [reportApiKey, setReportApiKey] = useState("");
   const [reportModel, setReportModel] = useState("gpt-5.6");
+  const [reportServerConfigured, setReportServerConfigured] = useState<boolean>();
   const [humanReviews, setHumanReviews] = useState<HumanReviewRecord[]>([]);
   const [evidenceOverrides, setEvidenceOverrides] = useState<
     ElementEvidenceOverride[]
@@ -455,6 +456,16 @@ export default function EvidenceAgentApp({ viewer }: { viewer: { displayName: st
     });
     void loadSample(assessmentSamples[0], true);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    void fetch("/api/agent/config", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((value: { serverConfigured?: boolean }) => {
+        const configured = value.serverConfigured === true;
+        setReportServerConfigured(configured);
+        if (!configured) setReportAuthMode("byok");
+      })
+      .catch(() => { setReportServerConfigured(false); setReportAuthMode("byok"); });
+  }, []);
   const reviewedModel = useMemo(
     () => effectiveModel(model, evidenceOverrides),
     [model, evidenceOverrides],
@@ -980,15 +991,25 @@ export default function EvidenceAgentApp({ viewer }: { viewer: { displayName: st
     }
   }
 
-  function downloadReport() {
-    if (!verification.valid) return;
-    const blob = new Blob([report], { type: "text/markdown" });
+  function downloadReport(format: "markdown" | "json") {
+    if (!verification.valid || reportStale || !reportReady) {
+      flash(locale === "zh" ? "报告尚未通过验证，不能导出。" : "The report has not passed verification and cannot be exported.");
+      return;
+    }
+    const exportValue = format === "json" ? JSON.stringify({ model: { name: model.name, filename: model.filename, schema: model.schema, units: model.units }, rulePackage: { id: selectedPackage.id, name: selectedPackage.name, version: selectedPackage.version }, conclusion: reportFindings.some((item) => item.status === "FAIL") ? "NON_COMPLIANT" : reportFindings.some((item) => item.status === "REVIEW") ? "PROFESSIONAL_REVIEW_REQUIRED" : "NO_NON_COMPLIANCE_IDENTIFIED", findings: reportFindings, generation: { mode: reportMode, verified: true } }, null, 2) : report;
+    const blob = new Blob([exportValue], { type: format === "json" ? "application/json" : "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const anchor = globalThis.document.createElement("a");
     anchor.href = url;
-    anchor.download = `${model.name.replace(/\W+/g, "-").toLowerCase()}-${locale}-report.md`;
+    anchor.download = `${model.name.replace(/[^a-zA-Z0-9\u4e00-\u9fff]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "bim-model"}-${reportBrief.language}-report.${format === "json" ? "json" : "md"}`;
+    globalThis.document.body.appendChild(anchor);
     anchor.click();
-    URL.revokeObjectURL(url);
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  }
+  function printReport() {
+    if (!verification.valid || reportStale || !reportReady) return;
+    window.print();
   }
   const selectViewerElement = (element: ViewerElement | null) => {
     setSelectedElement(element);
@@ -1085,7 +1106,7 @@ export default function EvidenceAgentApp({ viewer }: { viewer: { displayName: st
         : reportBrief.language === "bilingual"
           ? "Write each section first in native British English and then in professional Simplified Chinese. Keep the two versions semantically equivalent."
           : "Use native British English.";
-    const message = `Write a professional ${reportBrief.detail === "per-finding" ? "finding-by-finding" : "summary"} narrative for the ${reportBrief.audience} using every supplied deterministic result. ${languageInstruction} Do not change any status, number, GlobalId, rule or evidence path.`;
+    const message = `Write a professional ${reportBrief.detail === "per-finding" ? "finding-by-finding" : "summary"} BIM pre-review narrative for the ${reportBrief.audience} using every supplied deterministic result. ${languageInstruction} Use the exact sections: Model name; Review conclusion; Confirmed non-compliance details; Matters requiring professional review; Remediation priority recommendations. Treat FAIL as confirmed non-compliance, REVIEW as uncertainty rather than failure, and PASS as passed. Use only the supplied priority codes. Do not change or invent any status, number, GlobalId, rule, priority or evidence path.`;
     try {
       const response = await fetch("/api/agent", {
         method: "POST",
@@ -1566,6 +1587,15 @@ export default function EvidenceAgentApp({ viewer }: { viewer: { displayName: st
               </div>
             ) : (
               <>
+                <div className="review-next-actions">
+                  <button onClick={() => { setProvider("openai"); setView("agents"); }}>
+                    ✦ {locale === "zh" ? "让 AI 解释与归纳当前结果" : "Ask AI to explain and synthesise these results"}
+                  </button>
+                  <button onClick={() => setView("report")}>
+                    {locale === "zh" ? "生成专业审查报告" : "Prepare the professional review report"} →
+                  </button>
+                  <small>{locale === "zh" ? "AI 只解释已验证结果；规则判定仍由确定性引擎负责。" : "AI explains verified results only; deterministic rules remain the verdict authority."}</small>
+                </div>
                 <div className="finding-list">
                   {visibleFindings.map((finding) => {
                     const human = humanReviews
@@ -2415,13 +2445,11 @@ export default function EvidenceAgentApp({ viewer }: { viewer: { displayName: st
               </p>
             </div>
             {reportReady && (
-              <button
-                className="primary"
-                disabled={!verification.valid || reportStale}
-                onClick={downloadReport}
-              >
-                {t.download}
-              </button>
+              <div className="report-export-actions">
+                <button className="primary" disabled={!verification.valid || reportStale} onClick={() => downloadReport("markdown")}>{t.download}</button>
+                <button disabled={!verification.valid || reportStale} onClick={() => downloadReport("json")}>{locale === "zh" ? "导出审查数据 JSON" : "Export review data JSON"}</button>
+                <button disabled={!verification.valid || reportStale} onClick={printReport}>{locale === "zh" ? "打印／另存为 PDF" : "Print / Save as PDF"}</button>
+              </div>
             )}
           </div>
           {!findings.length ? (
@@ -2829,7 +2857,7 @@ export default function EvidenceAgentApp({ viewer }: { viewer: { displayName: st
                       }
                     >
                       <option value="operator">
-                        {locale === "zh" ? "平台密钥" : "Platform key"}
+                        {locale === "zh" ? `平台密钥${reportServerConfigured ? "（已配置）" : "（未配置）"}` : `Platform key${reportServerConfigured ? " (configured)" : " (not configured)"}`}
                       </option>
                       <option value="byok">
                         {locale === "zh"
@@ -2857,6 +2885,11 @@ export default function EvidenceAgentApp({ viewer }: { viewer: { displayName: st
                       </small>
                     </label>
                   )}
+                  <p className="ai-execution-disclosure">
+                    {locale === "zh"
+                      ? "AI 仅解释确定性结果并提出整改次序；不会执行规则或更改机器判定。未成功调用模型时，报告会明确标记为本地确定性输出。"
+                      : "AI explains deterministic results and remediation order only; it does not execute rules or change machine verdicts. If no model call succeeds, the report is explicitly labelled as deterministic local output."}
+                  </p>
                   <label>
                     {locale === "zh" ? "模型" : "Model"}
                     <select
@@ -2983,13 +3016,15 @@ export default function EvidenceAgentApp({ viewer }: { viewer: { displayName: st
                         <p>{reportNarrative}</p>
                       </section>
                     )}
-                    {reportBrief.detail === "per-finding" &&
-                      reportFindings.map((finding) => (
+                    {reportBrief.detail === "per-finding" && <>
+                      <h3>{locale === "zh" ? "违规明细" : "Confirmed non-compliance details"}</h3>
+                      {!reportFindings.some((finding) => finding.status === "FAIL") && <p className="report-none">{locale === "zh" ? "未发现已确认的违规项；待复核事项不计作违规。" : "No confirmed non-compliances were identified; review matters are not classified as failures."}</p>}
+                      {reportFindings.filter((finding) => finding.status === "FAIL").map((finding) => (
                         <article key={finding.id}>
                           <Status value={finding.status} locale={locale} />
                           <div>
                             <h4>
-                              {finding.elementName} — {finding.ruleTitle}
+                              {finding.priority ? `${finding.priority} · ` : ""}{finding.elementName} — {finding.ruleTitle}
                             </h4>
                             <p>{finding.message}</p>
                             {reportBrief.includeIdentifiers && (
@@ -3007,6 +3042,27 @@ export default function EvidenceAgentApp({ viewer }: { viewer: { displayName: st
                           </div>
                         </article>
                       ))}
+                      <h3>{locale === "zh" ? "待专业复核事项" : "Matters requiring professional review"}</h3>
+                      {!reportFindings.some((finding) => finding.status === "REVIEW") && <p className="report-none">{locale === "zh" ? "没有待专业复核事项。" : "No matters require professional review."}</p>}
+                      {reportFindings.filter((finding) => finding.status === "REVIEW").map((finding) => (
+                        <article key={finding.id}>
+                          <Status value={finding.status} locale={locale} />
+                          <div>
+                            <h4>{finding.priority ? `${finding.priority} · ` : ""}{finding.elementName} — {finding.ruleTitle}</h4>
+                            <p>{finding.message}</p>
+                            <p><b>{locale === "zh" ? "观测证据：" : "Observed evidence: "}</b>{finding.observed}</p>
+                            <p><b>{locale === "zh" ? "验收准则：" : "Acceptance criterion: "}</b>{finding.required}</p>
+                            {reportBrief.includeIdentifiers && <small>{finding.elementId}</small>}
+                            {reportBrief.includeEvidencePaths && <small> · {finding.evidencePath}</small>}
+                            {reportBrief.includeActions && <p><b>{locale === "zh" ? "跟进行动：" : "Follow-up action: "}</b>{finding.nextStep}</p>}
+                          </div>
+                        </article>
+                      ))}
+                      <h3>{locale === "zh" ? "整改优先级建议" : "Remediation priority recommendations"}</h3>
+                      <div className="priority-summary">
+                        {(["P1", "P2", "P3"] as const).map((priority) => <span key={priority}><b>{priority}</b>{reportFindings.filter((finding) => finding.priority === priority).length}</span>)}
+                      </div>
+                    </>}
                     <footer>
                       <span>{t.disclaimer}</span>
                     </footer>

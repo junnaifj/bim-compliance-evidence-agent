@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { authenticatedUserFromHeaders, type AuthenticatedUser } from "../lib/authenticated-user";
+import { authenticatedUserFromHeaders, type AuthenticatedUser } from "../core/review/authenticated-user";
 
 export type ChatGPTUser = AuthenticatedUser;
 

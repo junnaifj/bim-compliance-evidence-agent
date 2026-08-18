@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { BuildingModel, Finding, Locale, RuleDefinition } from "../lib/compliance";
+import type { BuildingModel, Finding, Locale, RuleDefinition } from "../core/compliance/compliance";
 import {
   confirmOverride, currentReview, previewOverride, revertLatestOverride, saveReview, validateOverride,
   type ElementEvidenceOverride, type HumanReviewRecord, type OverrideDraft, type OverrideField, type OverrideImpact, type OverrideProvenance, type ReviewDisposition,
-} from "../lib/human-review";
+} from "../core/review/human-review";
 
 type Props = {
   model: BuildingModel;

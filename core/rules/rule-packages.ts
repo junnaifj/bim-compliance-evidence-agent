@@ -1,4 +1,4 @@
-import { builtinRules, type Finding, type Locale, type RuleDefinition } from "./compliance.ts";
+import { builtinRules, type Finding, type Locale, type RuleDefinition } from "../compliance/compliance.ts";
 import type { RequirementPassage, RuleDocument } from "./document-intelligence.ts";
 
 export type RulePackageDecision = "INCLUDE" | "REFERENCE_ONLY" | "EXCLUDE";

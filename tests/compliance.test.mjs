@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { analyseModel, buildReport, builtinRules, compareModels, parseIfc, proposeRule, resolveRuleProposal, verifyReport } from "../lib/compliance.ts";
+import { analyseModel, buildReport, builtinRules, compareModels, parseIfc, proposeRule, resolveRuleProposal, verifyReport } from "../core/compliance/compliance.ts";
 
 const explicitDoorModel = (widthMm) => ({ id: "test", name: "Boundary fixture", filename: "boundary.ifc", schema: "IFC4", units: "mm", storeys: 1, source: "uploaded", spaces: [], doors: [{ expressId: 12, globalId: "2xQ7A1BOUNDARY000000001", name: "Exit D-01", widthMm, widthSource: "clear_width", isExit: true, fireRating: "FD60" }] });
 
@@ -54,12 +54,21 @@ test("English and Chinese reports use natural professional language without leak
   const chineseFindings = analyseModel(model, builtinRules, "zh");
   const english = buildReport(model, englishFindings, "en");
   const chinese = buildReport(model, chineseFindings, "zh");
-  assert.match(english, /Executive summary/); assert.match(english, /Professional review required|Fail|Pass/);
+  assert.match(english, /Review conclusion/); assert.match(english, /Confirmed non-compliance details/); assert.match(english, /Remediation priority recommendations/); assert.match(english, /Professional review required|Fail|Pass/);
   assert.doesNotMatch(english, /需专业复核|毫米|证据质量/);
-  assert.match(chinese, /执行摘要/); assert.match(chinese, /需专业复核|不通过|通过/);
+  assert.match(chinese, /审查结论/); assert.match(chinese, /违规明细/); assert.match(chinese, /整改优先级建议/); assert.match(chinese, /需专业复核|不通过|通过/);
   assert.doesNotMatch(chinese, /Reliability:|Schema:|No usable width property|nominal proxy/);
   assert.deepEqual(verifyReport(english, englishFindings), { valid: true, issues: [] });
   assert.deepEqual(verifyReport(chinese, chineseFindings), { valid: true, issues: [] });
+});
+
+test("confirmed failures and review matters receive deterministic priorities without changing verdicts", () => {
+  const failed = analyseModel(explicitDoorModel(850));
+  assert.equal(failed.find((item) => item.ruleId === "EGRESS-WIDTH-001")?.priority, "P1");
+  const proxy = explicitDoorModel(850); proxy.doors[0].widthSource = "overall_width_proxy";
+  const reviewed = analyseModel(proxy);
+  assert.equal(reviewed.find((item) => item.ruleId === "EGRESS-WIDTH-001")?.status, "REVIEW");
+  assert.equal(reviewed.find((item) => item.ruleId === "EGRESS-WIDTH-001")?.priority, "P2");
 });
 
 test("summary reports may omit finding identifiers while retaining grounded totals", () => {

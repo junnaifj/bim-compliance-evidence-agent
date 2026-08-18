@@ -8,7 +8,7 @@
 - File extensions are allow-listed, size is bounded and malformed IFC input fails closed.
 - Extracted document text is untrusted. It can create only `DRAFT` candidate rules.
 - Verdicts are deterministic; natural-language text cannot override rule code.
-- Reports are checked against structured findings for identifiers and numerical claims before download.
+- Reports are checked against structured findings for identifiers, numerical claims, verdicts and remediation priorities before Markdown, JSON or print/PDF export.
 - Official government documents are linked rather than redistributed.
 
 Production multi-tenant use would additionally require authenticated storage isolation, malware scanning, retention controls, an SSRF-safe import service, encrypted secrets, cost limits and a formal DPIA.

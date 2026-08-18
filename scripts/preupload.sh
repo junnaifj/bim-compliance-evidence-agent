@@ -15,12 +15,19 @@ if git ls-files .project-trash | rg -q .; then
   exit 1
 fi
 
-obsolete_paths="$(git ls-files app/chatgpt-auth.ts db drizzle drizzle.config.ts examples/d1 examples/assessment-door-sample.ifc examples/buildingsmart-pcert-architecture.ifc public/file.svg public/globe.svg public/window.svg)"
+obsolete_paths="$(git ls-files lib manual-test-files db drizzle drizzle.config.ts examples/d1 examples/assessment-door-sample.ifc examples/buildingsmart-pcert-architecture.ifc public/file.svg public/globe.svg public/window.svg)"
 if [[ -n "$obsolete_paths" ]]; then
   echo "Upload blocked: obsolete starter files are still tracked:" >&2
   echo "$obsolete_paths" >&2
   exit 1
 fi
+
+for forbidden in .DS_Store tsconfig.tsbuildinfo .wrangler dist; do
+  if git ls-files | rg -q "(^|/)${forbidden//./\\.}(/|$)"; then
+    echo "Upload blocked: regenerable path '$forbidden' is tracked." >&2
+    exit 1
+  fi
+done
 
 credential_matches="$(git ls-files -z | xargs -0 rg -l -I 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{30,}|Bearer[[:space:]]+[A-Za-z0-9._-]{24,}' || true)"
 if [[ -n "$credential_matches" ]]; then

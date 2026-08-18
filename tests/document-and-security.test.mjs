@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { catalogueRequirementPassages, extractRulesFromText, officialRuleSources } from "../lib/document-intelligence.ts";
+import { catalogueRequirementPassages, extractRulesFromText, officialRuleSources } from "../core/rules/document-intelligence.ts";
 
 test("a traceable numerical sentence becomes a draft and never ACTIVE", () => {
   const rules = extractRulesFromText("Exit doors shall provide a minimum clear width of 0.90 m.", "doc-123");
@@ -29,7 +29,7 @@ test("requirement catalogue retains page anchors and separates structurable evid
 });
 
 test("the production PDF worker is shipped and configured before document parsing", async () => {
-  const worker = await readFile(new URL("../public/pdf.worker.min.mjs", import.meta.url)); const source = await readFile(new URL("../lib/document-intelligence.ts", import.meta.url), "utf8");
+  const worker = await readFile(new URL("../public/pdf.worker.min.mjs", import.meta.url)); const source = await readFile(new URL("../core/rules/document-intelligence.ts", import.meta.url), "utf8");
   assert.ok(worker.byteLength > 100_000); assert.match(source, /GlobalWorkerOptions\.workerSrc\s*=\s*workerUrl/);
   assert.ok(source.indexOf("await loadPdfJs()") < source.indexOf("pdfjs.getDocument"));
   assert.match(source, /EXTRACTION_ERROR/); assert.match(source, /TEXT_EXTRACTED_NO_RULES/); assert.match(source, /DRAFT_RULES_EXTRACTED/);
@@ -59,4 +59,13 @@ test("assessment samples remain operable at narrow responsive widths", async () 
   assert.doesNotMatch(page, /requestAnimationFrame\(\(\) => resolve\(\)\)/);
   assert.doesNotMatch(page, /new Promise<void>\(\(resolve\) => setTimeout/);
   assert.match(css, /@media\(max-width:820px\)[\s\S]*?\.rail \.sample \{ display:flex/);
+});
+
+test("verified reports expose resilient Markdown, JSON and print/PDF exports", async () => {
+  const source = await readFile(new URL("../components/EvidenceAgentApp.tsx", import.meta.url), "utf8");
+  assert.match(source, /downloadReport\("markdown"\)/);
+  assert.match(source, /downloadReport\("json"\)/);
+  assert.match(source, /window\.print\(\)/);
+  assert.match(source, /document\.body\.appendChild\(anchor\)/);
+  assert.match(source, /setTimeout\(\(\) => URL\.revokeObjectURL/);
 });

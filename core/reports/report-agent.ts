@@ -1,4 +1,4 @@
-import type { Finding, FindingStatus, Locale } from "./compliance";
+import type { Finding, FindingStatus, Locale } from "../compliance/compliance";
 
 export type ReportAudience = "project-team" | "client" | "fire-engineer" | "regulator";
 export type ReportBrief = {

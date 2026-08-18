@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Finding } from "../lib/compliance";
-import { buildPickStack, cyclePickCandidate, describeElementVisual, normaliseGlobalId, type ViewerElement, type ViewerInteraction } from "../lib/viewer-interaction";
-import { modelBaselineY } from "../lib/viewer-geometry";
+import type { Finding } from "../core/compliance/compliance";
+import { buildPickStack, cyclePickCandidate, describeElementVisual, normaliseGlobalId, type ViewerElement, type ViewerInteraction } from "../core/compliance/viewer-interaction";
+import { modelBaselineY } from "../core/compliance/viewer-geometry";
 
 type Props = {
   source: string | ArrayBuffer | null;

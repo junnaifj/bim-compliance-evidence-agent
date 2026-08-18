@@ -1,4 +1,4 @@
-# System Sequence Design and Test Method · SSD v1.8
+# System Sequence Design and Test Method · SSD v1.9
 
 ## Runtime SSD
 
@@ -85,7 +85,7 @@ Every change runs, in order:
 19. PDF worker asset gate: the production build serves the configured worker URL, initialisation happens before `getDocument`, and the four-page official fixture yields its expected hash, page count and non-zero extracted character count.
 20. PDF outcome-state tests distinguish `EXTRACTION_ERROR`, `TEXT_EXTRACTED_NO_RULES` and `DRAFT_RULES_EXTRACTED`; none may silently activate a rule.
 21. IFC coordinate tests preserve every placed XYZ vertex exactly and retain the established Three.js Y-up camera/grid convention; only the viewer grid is moved to the model minimum Y, without rotating or translating the model root.
-22. Browser regressions run against both a built-in IFC and `manual-test-files/ifc/IfcOpenHouse.ifc`, including coloured discovery, deep selection, grid alignment and PDF upload.
+22. Browser regressions run against both a built-in IFC and `fixtures/ifc/IfcOpenHouse.ifc`, including coloured discovery, deep selection, grid alignment and PDF upload.
 23. Storey-index tests link elements through `IfcRelContainedInSpatialStructure` by GlobalId, retain unassigned elements, and prove that storey filtering never rewrites geometry coordinates.
 24. Review-queue tests cover status and storey filters, findings-row reverse selection, `F` next FAIL, `R` next REVIEW, wrap-around and no-result behaviour; shortcuts are ignored while typing in an input or textarea.
 25. Evidence-explanation tests require the displayed observation, threshold, deficit, unit, source anchor, reliability and human-review reason to match the selected structured finding exactly.
@@ -121,6 +121,14 @@ Every change runs, in order:
 55. Sign-out and return-path tests permit same-origin relative paths only and reject protocol-relative, external and reserved authentication paths.
 56. Language-purity tests generate findings independently for each report locale, preserve identical machine codes and values, and reject leaked English prose in Chinese output or Chinese prose in English output.
 57. Professional-report tests require project particulars, an executive conclusion, complete counts, finding-level conclusions, acceptance criteria, evidence quality, recommended actions and a limitation statement.
+58. Review-semantics tests permit only `FAIL` in confirmed non-compliance details; `REVIEW` appears in a separate professional-review section and cannot be promoted to failure or pass.
+59. Priority tests derive P1/P2/P3 from machine status and rule severity. Agent output cannot introduce or alter a priority.
+60. Export tests cover Markdown, structured JSON and print/PDF, safe filenames, delayed Blob URL release, stale-report blocking and visible recovery reasons.
+61. One-source tests require page KPIs, finding sections, 3D status, human review and every export format to use the same structured result set.
+62. AI-disclosure tests distinguish successful OpenAI execution, deterministic local generation and explicit safe fallback; a local template can never be labelled AI-generated.
+63. AI-report tests require model name, review conclusion, confirmed non-compliance details, professional-review matters and remediation priorities, then reject unknown rules, priorities, GlobalIds, statuses or numerical claims.
+64. Clean-tree tests reject `lib/`, `manual-test-files/`, `.project-trash/`, `.wrangler/`, `dist/`, `.DS_Store`, TypeScript caches and restricted official PDFs from the Git package.
+65. Clean-install tests reconstruct the application from tracked files with `npm ci`, then run lint, strict type-check, production build and the full test suite.
 
 Deployment requires the complete `npm run quality` gate.
 

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildPickStack, choosePickCandidate, cyclePickCandidate, describeElementVisual, filterFindingsForSelection, initialViewerInteraction, nextFindingByStatus, reduceViewerInteraction, shouldHandleReviewShortcut } from "../lib/viewer-interaction.ts";
-import { heightAboveBaseline, modelBaselineY, preserveIfcCoordinates } from "../lib/viewer-geometry.ts";
-import { defaultReportBrief, findingsForBrief, interpretReportRequest } from "../lib/report-agent.ts";
+import { buildPickStack, choosePickCandidate, cyclePickCandidate, describeElementVisual, filterFindingsForSelection, initialViewerInteraction, nextFindingByStatus, reduceViewerInteraction, shouldHandleReviewShortcut } from "../core/compliance/viewer-interaction.ts";
+import { heightAboveBaseline, modelBaselineY, preserveIfcCoordinates } from "../core/compliance/viewer-geometry.ts";
+import { defaultReportBrief, findingsForBrief, interpretReportRequest } from "../core/reports/report-agent.ts";
 
 const findings = [
   { id: "a", elementId: "G-1", status: "FAIL" },

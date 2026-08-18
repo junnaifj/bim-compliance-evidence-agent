@@ -1,4 +1,4 @@
-import type { Finding, RuleDefinition } from "./compliance.ts";
+import type { Finding, RuleDefinition } from "../compliance/compliance.ts";
 import type { AgentRole } from "./agent.ts";
 
 export type AgentHistoryMessage = { role: "user" | "assistant"; text: string };
@@ -140,6 +140,8 @@ const closeTo = (values: number[], candidate: number) => values.some((value) => 
 export function verifyAgentEnvelope(envelope: AgentEnvelope, request: AgentRequest): string[] {
   const issues: string[] = [];
   const findings = request.context.findings;
+  const allowedPriorities = new Set(findings.flatMap((finding) => finding.priority ? [finding.priority] : []));
+  for (const match of envelope.answer.matchAll(/\bP[1-3]\b/g)) if (!allowedPriorities.has(match[0] as "P1" | "P2" | "P3")) issues.push(`Invented remediation priority: ${match[0]}`);
   for (const citation of envelope.citations) {
     const finding = findings.find((item) => item.elementId === citation.elementId);
     if (!finding) { issues.push(`Invented GlobalId: ${citation.elementId}`); continue; }

@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import { agentResponseSchema, apiKeyLooksValid, assertSameOrigin, redactSecrets, validateAgentRequest, verifyAgentEnvelope } from "../lib/agent-contract.ts";
-import { agentToolDefinitions, executeAgentTool } from "../lib/agent-tools.ts";
-import { AGENT_INSTRUCTIONS, probeOpenAIKey, runOpenAIResponsesAgent } from "../lib/openai-agent.server.ts";
-import { consumeAgentRateLimit, resolveAgentCredential } from "../lib/agent-gateway.ts";
+import { agentResponseSchema, apiKeyLooksValid, assertSameOrigin, redactSecrets, validateAgentRequest, verifyAgentEnvelope } from "../core/agent/agent-contract.ts";
+import { agentToolDefinitions, executeAgentTool } from "../core/agent/agent-tools.ts";
+import { AGENT_INSTRUCTIONS, probeOpenAIKey, runOpenAIResponsesAgent } from "../core/agent/openai-agent.server.ts";
+import { consumeAgentRateLimit, resolveAgentCredential } from "../core/agent/agent-gateway.ts";
 
 const finding = {
   id: "finding-1", ruleId: "EGRESS-WIDTH-001", ruleVersion: 1,
@@ -94,6 +94,7 @@ test("agent verifier accepts grounded claims and blocks hallucinated BIM evidenc
   assert.ok(verifyAgentEnvelope({ ...safeEnvelope, answer: safeEnvelope.answer.replace("900", "1000") }, request).some((item) => /number/i.test(item)));
   assert.ok(verifyAgentEnvelope({ ...safeEnvelope, citations: [{ ...safeEnvelope.citations[0], elementId: "0vB1xY2zA3B4C5D6E7F8G0" }] }, request).some((item) => /GlobalId/i.test(item)));
   assert.ok(verifyAgentEnvelope({ ...safeEnvelope, citations: [{ ...safeEnvelope.citations[0], status: "PASS" }] }, request).some((item) => /verdict/i.test(item)));
+  assert.ok(verifyAgentEnvelope({ ...safeEnvelope, answer: `${safeEnvelope.answer} Treat this as P1.` }, request).some((item) => /priority/i.test(item)));
 });
 
 test("structured response schema is strict at every object boundary", () => {
@@ -109,7 +110,7 @@ test("system instructions treat documents as evidence, not executable instructio
 });
 
 test("Responses requests do not send the unsupported current_turn reasoning context", async () => {
-  const source = await fs.promises.readFile(new URL("../lib/openai-agent.server.ts", import.meta.url), "utf8");
+  const source = await fs.promises.readFile(new URL("../core/agent/openai-agent.server.ts", import.meta.url), "utf8");
   assert.doesNotMatch(source, /context:\s*["']current_turn["']/);
   assert.match(source, /reasoning:\s*\{\s*effort:\s*["']low["']\s*\}/);
 });
